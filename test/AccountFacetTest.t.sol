@@ -11,16 +11,18 @@ import "../src/facets/AaveFacet.sol";
 import "../src/AccountFactory.sol";
 import "../src/LeverageFarming.sol";
 
-import {BaseSetup} from "./BaseSetup.sol";
-import {StateDeployDiamond} from "./StateDeployDiamond.sol";
+import {BaseSetup} from "./utils/BaseSetup.sol";
+import {StateDeployDiamond} from "./utils/StateDeployDiamond.sol";
 
 contract AccountFacetTest is BaseSetup, StateDeployDiamond {
+    using SafeERC20 for IERC20;
     AccountFactory implementation;
     AccountFactory accFactory;
     LeverageFarming farming;
 
     UpgradeableBeacon beacon;
     BeaconProxy proxy;
+    AccountFacet accFacet;
 
     event AccountCreated(address indexed);
 
@@ -39,6 +41,8 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         accFactory = AccountFactory(payable(address(proxy)));
         farming = new LeverageFarming(address(diamond));
         LeverageFarmingFacet(address(diamond)).initLeverageFarming();
+
+        accFacet = AccountFacet(address(diamond));
     }
 
     function test_createAccount() public {
@@ -53,27 +57,44 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_depositToPool() public {
-        // Alice creates account and deposits 5 USDC to USDC pool.
+        // Alice creates account and deposits 500 USDC to USDC pool.
         vm.startPrank(alice);
 
-        // Alice deposits 5 USDC to pool, without creating account.
+        // Alice deposits 500 USDC to pool, without creating account.
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        AccountFacet(address(diamond)).deposit(1, 5);
+        accFacet.deposit(1, 500);
 
         // Alice creates an account
         accFactory.createAccount();
 
         // Alice deposits to invalid pool, so reverts
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        AccountFacet(address(diamond)).deposit(3, 5);
+        accFacet.deposit(3, 500);
 
         // Alice deposits 0 to pool, so reverts
         vm.expectRevert(BaseFacet.AmountZero.selector);
-        AccountFacet(address(diamond)).deposit(1, 0);
+        accFacet.deposit(1, 0);
 
-        // Alice deposits 5 USDC to pool
-        usdc.approve(address(diamond), 5);
-        AccountFacet(address(diamond)).deposit(1, 5);
+        uint256 aliceUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(
+            address(alice)
+        );
+        uint256 poolUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(
+            address(diamond)
+        );
+
+        // Alice deposits 500 USDC to pool
+        usdc.approve(address(diamond), 500);
+        accFacet.deposit(1, 500);
+
+        assertEq(
+            IERC20(USDC_ADDRESS).balanceOf(address(alice)),
+            aliceUsdcBalance - 500
+        );
+
+        assertEq(
+            IERC20(USDC_ADDRESS).balanceOf(address(diamond)),
+            poolUsdcBalance + 500
+        );
 
         vm.stopPrank();
     }
@@ -81,9 +102,9 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
     function test_withdrawFromPool() public {
         vm.startPrank(alice);
 
-        // Alice withdraw 5 USDC from pool, without creating account.
+        // Alice withdraw 500 USDC from pool, without creating account.
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        AccountFacet(address(diamond)).withdraw(1, 5);
+        accFacet.withdraw(1, 500);
 
         // Alice creates an account
         accFactory.createAccount();
@@ -92,10 +113,24 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposits from invalid pool, so reverts
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        AccountFacet(address(diamond)).withdraw(3, 5);
+        accFacet.withdraw(3, 500);
 
         vm.expectRevert(BaseFacet.ZeroAmountForWithdraw.selector);
-        AccountFacet(address(diamond)).withdraw(1, 5);
+        accFacet.withdraw(1, 500);
+
+        // Alice deposits 500 USDC to pool
+        IERC20(USDC_ADDRESS).safeApprove(address(accFacet), 500);
+        accFacet.deposit(1, 500);
+
+        uint256 aliceUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(
+            address(alice)
+        );
+
+        accFacet.withdraw(1, 500);
+        assertEq(
+            IERC20(USDC_ADDRESS).balanceOf(address(alice)),
+            aliceUsdcBalance + 500
+        );
 
         vm.stopPrank();
     }
@@ -105,16 +140,16 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         vm.startPrank(alice);
 
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        AccountFacet(address(diamond)).liquidate(address(bob), 1, 10);
+        accFacet.liquidate(address(bob), 1, 10);
 
         // Alice create account and liquidate bob's one, but pool is not supported, revert
         accFactory.createAccount();
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        AccountFacet(address(diamond)).liquidate(address(bob), 4, 10);
-        
+        accFacet.liquidate(address(bob), 4, 10);
+
         // Alice is going to liquidate his one, should revert
         vm.expectRevert(BaseFacet.InvalidLiquidateUser.selector);
-        AccountFacet(address(diamond)).liquidate(address(alice), 1, 10);
+        accFacet.liquidate(address(alice), 1, 10);
         vm.stopPrank();
     }
 }

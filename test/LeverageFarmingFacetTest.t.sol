@@ -11,8 +11,8 @@ import "../src/facets/AaveFacet.sol";
 import "../src/AccountFactory.sol";
 import "../src/LeverageFarming.sol";
 
-import {BaseSetup} from "./BaseSetup.sol";
-import {StateDeployDiamond} from "./StateDeployDiamond.sol";
+import {BaseSetup} from "./utils/BaseSetup.sol";
+import {StateDeployDiamond} from "./utils/StateDeployDiamond.sol";
 
 contract LeverageFarmingFacetTest is BaseSetup, StateDeployDiamond {
     LeverageFarming farming;

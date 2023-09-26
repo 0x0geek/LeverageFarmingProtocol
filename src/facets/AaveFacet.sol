@@ -16,8 +16,6 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
     address private constant AAVE_LENDING_POOL_ADDRESSES_PROVIDER =
         0xB53C1a33016B2DC2fF3653530bfF1848a515c8c5;
 
-    error InvalidDepositAmount();
-
     function depositToAave(
         address _tokenAddress,
         uint256 _amount
@@ -79,6 +77,12 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         depositor.stakeAmount[aTokenAddress] +=
             afterAtokenBalance -
             beforeATokenBalance;
+
+        console.logUint(afterAtokenBalance);
+        console.logUint(beforeATokenBalance);
+        console.logUint(depositor.debtAmount[aTokenAddress]);
+        console.logUint(depositAmount);
+        console.logUint(depositor.stakeAmount[aTokenAddress]);
     }
 
     function withdrawFromAave(
@@ -146,6 +150,23 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
             _amount,
             address(this)
         );
+
+        console.log(withdrawAmount);
+
+        uint256 tokenAmountForWithdraw = withdrawAmount.div(
+            LibFarmStorage.LEVERAGE_LEVEL
+        );
+
+        IERC20(pool.tokenAddress).safeApprove(
+            msg.sender,
+            tokenAmountForWithdraw
+        );
+        IERC20(pool.tokenAddress).safeTransfer(
+            msg.sender,
+            tokenAmountForWithdraw
+        );
+
+        emit WithdrawFromAave(msg.sender, tokenAmountForWithdraw);
     }
 
     function _lendingPool() internal view returns (address) {

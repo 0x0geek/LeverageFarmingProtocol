@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 /******************************************************************************\
 * Authors: Timo Neumann <timo@fyde.fi>
@@ -8,12 +8,12 @@ pragma solidity ^0.8.0;
 * to solidity tests.
 /******************************************************************************/
 
-import "./strings.sol";
-import "../../src/interfaces/IDiamondCut.sol";
+import "../../lib/solidity-stringutils/src/strings.sol";
+import "../../src/interfaces/IDiamond.sol";
 import "../../src/interfaces/IDiamondLoupe.sol";
 import "../../lib/forge-std/src/Test.sol";
 
-abstract contract HelperContract is IDiamondCut, IDiamondLoupe, Test {
+abstract contract HelperContract is IDiamond, IDiamondLoupe, Test {
     using strings for *;
 
     // return array of function selectors for given facet name
@@ -40,7 +40,7 @@ abstract contract HelperContract is IDiamondCut, IDiamondLoupe, Test {
         }
 
         strings.slice memory colon = ":".toSlice();
-        // strings.slice memory comma = ",".toSlice();
+        strings.slice memory comma = ",".toSlice();
         strings.slice memory dbquote = '"'.toSlice();
         selectors = new bytes4[]((s.count(colon)));
 
@@ -49,7 +49,7 @@ abstract contract HelperContract is IDiamondCut, IDiamondLoupe, Test {
             // split at colon, extract string up to next doublequote for methodname
             strings.slice memory method = s.split(colon).until(dbquote);
             selectors[i] = bytes4(method.keccak());
-            // strings.slice memory selectr = s.split(comma).until(dbquote); // advance s to the next comma
+            strings.slice memory selectr = s.split(comma).until(dbquote); // advance s to the next comma
         }
         return selectors;
     }

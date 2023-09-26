@@ -14,7 +14,7 @@ import "../src/facets/DiamondCutFacet.sol";
 import "../src/facets/DiamondLoupeFacet.sol";
 import "../src/facets/OwnershipFacet.sol";
 import "../src/upgradeInitializers/DiamondInit.sol";
-import "../test/HelperContract.sol";
+import "../test/utils/HelperContract.sol";
 
 contract DeployScript is Script, HelperContract {
     function run() external {

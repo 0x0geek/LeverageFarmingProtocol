@@ -24,6 +24,8 @@ contract BaseFacet {
         uint256 _borrowAmount
     );
 
+    event WithdrawFromAave(address indexed, uint256);
+
     error InvalidAccount();
     error InvalidOwner();
     error AmountZero();
@@ -40,6 +42,7 @@ contract BaseFacet {
     error NotOnwer();
     error ZeroAmountForWithdraw();
     error NotAvailableForWithdraw();
+    error InvalidDepositAmount();
 
     modifier onlyRegisteredAccount() {
         checkExistAccount(msg.sender);
@@ -104,10 +107,12 @@ contract BaseFacet {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 
         if (
-            fs.pools[0].tokenAddress != _tokenAddress ||
-            fs.pools[1].tokenAddress != _tokenAddress ||
-            fs.pools[2].tokenAddress != _tokenAddress
-        ) revert NotSupportedToken();
+            fs.pools[0].tokenAddress == _tokenAddress ||
+            fs.pools[1].tokenAddress == _tokenAddress ||
+            fs.pools[2].tokenAddress == _tokenAddress
+        ) return;
+
+        revert NotSupportedToken();
     }
 
     function checkIfSupportedAToken(
@@ -116,10 +121,12 @@ contract BaseFacet {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 
         if (
-            fs.pools[0].aTokenAddress != _tokenAddress ||
-            fs.pools[1].aTokenAddress != _tokenAddress ||
-            fs.pools[2].aTokenAddress != _tokenAddress
-        ) revert NotSupportedToken();
+            fs.pools[0].aTokenAddress == _tokenAddress ||
+            fs.pools[1].aTokenAddress == _tokenAddress ||
+            fs.pools[2].aTokenAddress == _tokenAddress
+        ) return;
+
+        revert NotSupportedToken();
     }
 
     function checkIfSupportedCToken(
@@ -128,10 +135,12 @@ contract BaseFacet {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 
         if (
-            fs.pools[0].cTokenAddress != _tokenAddress ||
-            fs.pools[1].cTokenAddress != _tokenAddress ||
-            fs.pools[2].cTokenAddress != _tokenAddress
-        ) revert NotSupportedToken();
+            fs.pools[0].cTokenAddress == _tokenAddress ||
+            fs.pools[1].cTokenAddress == _tokenAddress ||
+            fs.pools[2].cTokenAddress == _tokenAddress
+        ) return;
+
+        revert NotSupportedToken();
     }
 
     function calculateAssetAmount(
