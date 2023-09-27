@@ -61,8 +61,6 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
         address cTokenAddress = pool.cTokenAddress;
 
         depositor.debtAmount[cTokenAddress] += leverageAmount;
-        pool.borrowAmount += leverageAmount;
-        pool.balanceAmount -= leverageAmount;
 
         // Approve transfer on the ERC20 contract
         underlyingToken.safeApprove(cTokenAddress, depositAmount);
@@ -120,24 +118,24 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
             depositor.debtAmount[_cTokenAddress] = 0;
         else depositor.debtAmount[_cTokenAddress] -= withdrawAmount;
 
-        depositor.repayAmount[_cTokenAddress] += withdrawAmount;
+        // depositor.repayAmount[_cTokenAddress] += withdrawAmount;
 
         pool.balanceAmount += withdrawAmount;
         pool.borrowAmount -= withdrawAmount;
 
-        if (depositor.stakeAmount[_cTokenAddress] == 0) {
-            uint256 rewardAmount = depositor.repayAmount[_cTokenAddress] -
-                depositor.debtAmount[_cTokenAddress];
+        // if (depositor.stakeAmount[_cTokenAddress] == 0) {
+        //     uint256 rewardAmount = depositor.repayAmount[_cTokenAddress] -
+        //         depositor.debtAmount[_cTokenAddress];
 
-            uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
-            uint256 depositorReward = rewardAmount.sub(lpReward);
+        //     uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
+        //     uint256 depositorReward = rewardAmount.sub(lpReward);
 
-            pool.balanceAmount -= depositorReward;
-            pool.borrowAmount += depositorReward;
-            pool.rewardAmount += lpReward;
+        //     pool.balanceAmount -= depositorReward;
+        //     pool.borrowAmount += depositorReward;
+        //     pool.rewardAmount += lpReward;
 
-            depositor.rewardAmount += depositorReward;
-        }
+        //     depositor.rewardAmount += depositorReward;
+        // }
 
         uint256 redeemResult;
 

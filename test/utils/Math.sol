@@ -7,7 +7,11 @@ pragma solidity 0.8.20;
  * @author Alpha
  **/
 
-library MathCeil {
+library Math {
+    uint256 internal constant DECIMAL_18 = 1e18;
+    uint256 internal constant DECIMAL_6 = 1e6;
+    uint256 internal constant DECIMAL_8 = 1e8;
+
     /**
      * @notice a ceiling division
      * @return the ceiling result of division
@@ -19,5 +23,17 @@ library MathCeil {
             c = c + 1;
         }
         return c;
+    }
+
+    function toE18(uint256 _amount) internal pure returns (uint256) {
+        return _amount * DECIMAL_18;
+    }
+
+    function toE6(uint256 _amount) internal pure returns (uint256) {
+        return _amount * DECIMAL_6;
+    }
+
+    function toE8(uint256 _amount) internal pure returns (uint256) {
+        return _amount * DECIMAL_8;
     }
 }

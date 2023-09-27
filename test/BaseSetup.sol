@@ -9,7 +9,7 @@ import {IUniswapRouter} from "../src/interfaces/IUniswap.sol";
 import {IWETH} from "../src/interfaces/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract BaseSetup is Test {
+abstract contract BaseSetup is Test {
     address internal constant USDC_ADDRESS =
         0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address internal constant USDT_ADDRESS =

@@ -41,6 +41,7 @@ library LibFarmStorage {
         uint256 balanceAmount;
         uint256 interestAmount;
         uint256 borrowAmount;
+        uint256 stakeAmount;
         uint256 assetAmount;
         uint256 rewardAmount;
         bool supported;
@@ -50,6 +51,7 @@ library LibFarmStorage {
         uint256 amount;
         uint256 assetAmount;
         uint256 rewardAmount;
+        mapping(address => uint256) depositAmount;
         mapping(address => uint256) debtAmount;
         mapping(address => uint256) repayAmount;
         mapping(address => uint256) stakeAmount;

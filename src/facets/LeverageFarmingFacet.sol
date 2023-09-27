@@ -78,6 +78,7 @@ contract LeverageFarmingFacet is BaseFacet, ReentrancyGuard {
             balanceAmount: 0,
             interestAmount: 0,
             borrowAmount: 0,
+            stakeAmount: 0,
             assetAmount: 0,
             rewardAmount: 0,
             supported: true

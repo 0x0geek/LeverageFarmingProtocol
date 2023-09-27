@@ -40,7 +40,7 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         LibFarmStorage.Pool storage pool = fs.pools[poolIndex];
 
         uint256 leverageAmount = _amount.mul(LibFarmStorage.LEVERAGE_LEVEL);
-        uint256 depositAmount = _amount + leverageAmount;
+        uint256 depositAmount = _amount.add(leverageAmount);
 
         if (pool.balanceAmount < leverageAmount)
             revert InsufficientPoolBalance();
@@ -53,6 +53,8 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
 
         pool.balanceAmount -= leverageAmount;
         pool.borrowAmount += leverageAmount;
+
+        depositor.depositAmount[aTokenAddress] += _amount;
         depositor.debtAmount[aTokenAddress] += leverageAmount;
 
         uint256 beforeATokenBalance = IERC20(aTokenAddress).balanceOf(
@@ -70,19 +72,12 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
             0
         );
 
-        uint256 afterAtokenBalance = IERC20(aTokenAddress).balanceOf(
-            address(this)
-        );
+        uint256 balanceDiff = IERC20(aTokenAddress)
+            .balanceOf(address(this))
+            .sub(beforeATokenBalance);
 
-        depositor.stakeAmount[aTokenAddress] +=
-            afterAtokenBalance -
-            beforeATokenBalance;
-
-        console.logUint(afterAtokenBalance);
-        console.logUint(beforeATokenBalance);
-        console.logUint(depositor.debtAmount[aTokenAddress]);
-        console.logUint(depositAmount);
-        console.logUint(depositor.stakeAmount[aTokenAddress]);
+        depositor.stakeAmount[aTokenAddress] += balanceDiff;
+        pool.stakeAmount += balanceDiff;
     }
 
     function withdrawFromAave(
@@ -110,34 +105,35 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         if (aToken.balanceOf(address(this)) < _amount)
             revert InsufficientPoolBalance();
 
-        uint256 withdrawAmount = _amount.mul(
-            LibPriceOracle.getLatestPrice(LibPriceOracle.AAVE_USD_PRICE_FEED)
+        uint256 totalAmount = depositor.debtAmount[_aTokenAddress].add(
+            depositor.depositAmount[_aTokenAddress]
         );
 
+        uint256 withdrawDebtAmount = _amount
+            .mul(depositor.debtAmount[_aTokenAddress])
+            .div(totalAmount);
+
         depositor.stakeAmount[_aTokenAddress] -= _amount;
+        depositor.depositAmount[_aTokenAddress] -= _amount
+            .mul(depositor.depositAmount[_aTokenAddress])
+            .div(totalAmount);
 
-        if (depositor.debtAmount[_aTokenAddress] < withdrawAmount)
-            depositor.debtAmount[_aTokenAddress] = 0;
-        else depositor.debtAmount[_aTokenAddress] -= withdrawAmount;
+        uint256 totalRewardAmount = IERC20(_aTokenAddress).balanceOf(
+            address(this)
+        ) - pool.stakeAmount;
+        uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
+            pool.stakeAmount
+        );
 
-        depositor.repayAmount[_aTokenAddress] += withdrawAmount;
+        uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
 
-        pool.balanceAmount += withdrawAmount;
-        pool.borrowAmount -= withdrawAmount;
+        pool.rewardAmount += lpReward;
+        depositor.rewardAmount += rewardAmount.sub(lpReward);
 
-        if (depositor.stakeAmount[_aTokenAddress] == 0) {
-            uint256 rewardAmount = depositor.repayAmount[_aTokenAddress] -
-                depositor.debtAmount[_aTokenAddress];
+        depositor.repayAmount[_aTokenAddress] += withdrawDebtAmount;
 
-            uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
-            uint256 depositorReward = rewardAmount.sub(lpReward);
-
-            pool.balanceAmount -= depositorReward;
-            pool.borrowAmount += depositorReward;
-            pool.rewardAmount += lpReward;
-
-            depositor.rewardAmount += depositorReward;
-        }
+        pool.balanceAmount += withdrawDebtAmount;
+        pool.borrowAmount -= withdrawDebtAmount;
 
         address lendingPoolAddr = _lendingPool();
 
@@ -146,14 +142,12 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
 
         // Withdraw tokens from Aave v2 lending pool
         ILendingPool(lendingPoolAddr).withdraw(
-            _aTokenAddress,
+            pool.tokenAddress,
             _amount,
             address(this)
         );
 
-        console.log(withdrawAmount);
-
-        uint256 tokenAmountForWithdraw = withdrawAmount.div(
+        uint256 tokenAmountForWithdraw = _amount.div(
             LibFarmStorage.LEVERAGE_LEVEL
         );
 
