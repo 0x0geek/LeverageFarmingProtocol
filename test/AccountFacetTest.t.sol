@@ -152,4 +152,22 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         accFacet.liquidate(address(alice), 1, 10);
         vm.stopPrank();
     }
+
+    function test_claimReward() public {
+        // Alice tries to get reward without creating account
+        vm.startPrank(alice);
+        vm.expectRevert(BaseFacet.InvalidAccount.selector);
+        accFacet.claimReward(1);
+
+        // Alice create account and liquidate bob's one, but pool is not supported, revert
+        accFactory.createAccount();
+        vm.expectRevert(BaseFacet.NotSupportedToken.selector);
+        accFacet.claimReward(3);
+
+        // Alice is going to claim his reward, but no reward for him, should revert.
+        vm.expectRevert(BaseFacet.NoReward.selector);
+        accFacet.claimReward(1);
+
+        vm.stopPrank();
+    }
 }

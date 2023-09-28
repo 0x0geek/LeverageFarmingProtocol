@@ -51,9 +51,9 @@ library LibFarmStorage {
         uint256 amount;
         uint256 assetAmount;
         uint256 rewardAmount;
+        uint256 exchangeRate;
         mapping(address => uint256) depositAmount;
         mapping(address => uint256) debtAmount;
-        mapping(address => uint256) repayAmount;
         mapping(address => uint256) stakeAmount;
     }
 

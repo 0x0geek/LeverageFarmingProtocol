@@ -35,8 +35,13 @@ contract BaseSetup is Test {
     address internal constant AETHER_ADDRESS =
         0x030bA81f1c18d280636F32af80b9AAd02Cf0854e;
 
+    address internal constant COMPTROLLER_ADDRESS =
+        0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B;
+
+    uint256 internal constant ETHER_DECIMAL = 1e18;
+
     // Skip forward block.timestamp for 3 days.
-    uint256 internal constant SKIP_FORWARD_PERIOD = 3600 * 24 * 30;
+    uint256 internal constant SKIP_FORWARD_PERIOD = 3600 * 24 * 1000;
 
     address[] internal pathUSDT;
     address[] internal pathUSDC;

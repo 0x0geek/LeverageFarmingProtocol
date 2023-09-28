@@ -43,6 +43,8 @@ contract BaseFacet {
     error ZeroAmountForWithdraw();
     error NotAvailableForWithdraw();
     error InvalidDepositAmount();
+    error InvalidSupplyAmount();
+    error NoReward();
 
     modifier onlyRegisteredAccount() {
         checkExistAccount(msg.sender);

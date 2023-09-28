@@ -18,6 +18,7 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
     event Deposit(address indexed _user, uint8 _poolIndex, uint256 _amount);
     event Repay(address indexed _user, address indexed _token, uint256 _amount);
     event Withdraw(address indexed _user, uint8 _poolIndex, uint256 _amount);
+    event ClaimReward(address indexed _user, uint256 _amount);
 
     function deposit(
         uint8 _poolIndex,
@@ -118,5 +119,23 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
         pool.assetAmount -= assetAmount;
         IERC20(pool.tokenAddress).safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, _poolIndex, _amount);
+    }
+
+    function claimReward(
+        uint8 _poolIndex
+    ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
+        LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
+        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
+        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
+            msg.sender
+        ];
+
+        if (depositor.rewardAmount == 0) revert NoReward();
+
+        IERC20 token = IERC20(pool.tokenAddress);
+        token.safeApprove(msg.sender, depositor.rewardAmount);
+        token.safeTransfer(msg.sender, depositor.rewardAmount);
+
+        emit ClaimReward(msg.sender, depositor.rewardAmount);
     }
 }

@@ -117,23 +117,26 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         depositor.depositAmount[_aTokenAddress] -= _amount
             .mul(depositor.depositAmount[_aTokenAddress])
             .div(totalAmount);
+        depositor.debtAmount[_aTokenAddress] -= withdrawDebtAmount;
 
         uint256 totalRewardAmount = IERC20(_aTokenAddress).balanceOf(
             address(this)
         ) - pool.stakeAmount;
-        uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
-            pool.stakeAmount
-        );
 
-        uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
+        if (totalRewardAmount > 0) {
+            uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
+                pool.stakeAmount
+            );
 
-        pool.rewardAmount += lpReward;
-        depositor.rewardAmount += rewardAmount.sub(lpReward);
+            uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
 
-        depositor.repayAmount[_aTokenAddress] += withdrawDebtAmount;
+            pool.rewardAmount += lpReward;
+            depositor.rewardAmount += rewardAmount.sub(lpReward);
+        }
 
         pool.balanceAmount += withdrawDebtAmount;
         pool.borrowAmount -= withdrawDebtAmount;
+        pool.stakeAmount -= _amount;
 
         address lendingPoolAddr = _lendingPool();
 
