@@ -2,7 +2,6 @@
 pragma solidity 0.8.20;
 
 import "@chainlink/src/interfaces/AggregatorV3Interface.sol";
-import "forge-std/console.sol";
 
 library LibPriceOracle {
     address public constant ETH_USD_PRICE_FEED =
@@ -20,7 +19,6 @@ library LibPriceOracle {
         AggregatorV3Interface aggregator = AggregatorV3Interface(_address);
 
         (, int256 latestPrice, , , ) = aggregator.latestRoundData();
-        console.logInt(latestPrice);
         return uint256(latestPrice);
     }
 }

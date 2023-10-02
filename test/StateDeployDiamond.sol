@@ -21,8 +21,6 @@ import "../src/facets/LeverageFarmingFacet.sol";
 import "../src/Diamond.sol";
 import "./HelperContract.sol";
 
-import "forge-std/console.sol";
-
 abstract contract StateDeployDiamond is HelperContract {
     //contract types of facets to be deployed
     Diamond diamond;

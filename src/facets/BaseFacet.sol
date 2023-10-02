@@ -11,7 +11,6 @@ import "../libraries/LibFarmStorage.sol";
 import "../libraries/ReEntrancyGuard.sol";
 import "../libraries/LibPriceOracle.sol";
 import "../libraries/LibMath.sol";
-import "forge-std/console.sol";
 
 contract BaseFacet {
     using SafeERC20 for IERC20;

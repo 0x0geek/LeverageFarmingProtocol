@@ -49,10 +49,6 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
         // Calculates the leverage amount based on user's deposit amount.
         uint256 leverageAmount = _amount.mul(LibFarmStorage.LEVERAGE_LEVEL);
 
-        console.log("Pool balance =");
-        console.log(pool.balanceAmount);
-        console.log(leverageAmount);
-        console.log("----------------");
         // If pool hasn't enough balance for leverage amount, should revert
         if (pool.balanceAmount < leverageAmount)
             revert InsufficientPoolBalance();
@@ -142,8 +138,6 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
             revert InsufficientUserBalance();
 
         // If pool hasn't enough balance for withdraw, should revert
-        console.log("Pool stake amount = ");
-        console.log(pool.stakeAmount);
         if (pool.stakeAmount < _amount) revert InsufficientPoolBalance();
 
         // Calculates depositor's total debt amount

@@ -27,8 +27,6 @@ import "./../utils/Math.sol";
 
 import "./HelperContract.sol";
 
-import "forge-std/console.sol";
-
 abstract contract StateDeployDiamond is HelperContract {
     using SafeERC20 for IERC20;
     using Math for uint256;

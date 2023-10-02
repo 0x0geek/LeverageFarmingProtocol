@@ -109,8 +109,6 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         // Alice creates an account
         accFactory.createAccount();
 
-        address daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-
         // Alice deposits from invalid pool, so reverts
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
         accFacet.withdraw(3, 500);

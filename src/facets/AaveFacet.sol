@@ -2,8 +2,6 @@
 pragma solidity 0.8.20;
 pragma experimental ABIEncoderV2;
 
-import "forge-std/console.sol";
-
 import "../interfaces/IAave.sol";
 import "./BaseFacet.sol";
 
