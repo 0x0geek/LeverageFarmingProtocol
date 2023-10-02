@@ -178,50 +178,50 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
             }
         }
 
-        //Approve lending pool to spend your aTokens
-        // ILiquidityGauge(_crvData.gaugeAddress).withdraw(_amount);
+        // Approve lending pool to spend your aTokens
+        ILiquidityGauge(_crvData.gaugeAddress).withdraw(_amount);
 
-        // uint256 withdrawDepositAmount;
+        uint256 withdrawDepositAmount;
 
-        // {
-        //     // remove liquidity from Curve pool
-        //     uint256 amount = ICurvePool(_crvData.poolAddress)
-        //         .remove_liquidity_one_coin(
-        //             _amount,
-        //             int128(int8(_poolIndex)),
-        //             0
-        //         );
+        {
+            // remove liquidity from Curve pool
+            uint256 amount = ICurvePool(_crvData.poolAddress)
+                .remove_liquidity_one_coin(
+                    _amount,
+                    int128(int8(_poolIndex)),
+                    0
+                );
 
-        //     // Calculate depositor's debt amount based on the withdrawn amount
-        //     uint256 withdrawDebtAmount = amount
-        //         .mul(depositor.debtAmount[lpTokenAddress])
-        //         .div(totalAmount);
-        //     // Calculate's depositor's deposit amount based on the withdrawn amount
-        //     withdrawDepositAmount = amount
-        //         .mul(depositor.depositAmount[lpTokenAddress])
-        //         .div(totalAmount);
+            // Calculate depositor's debt amount based on the withdrawn amount
+            uint256 withdrawDebtAmount = amount
+                .mul(depositor.debtAmount[lpTokenAddress])
+                .div(totalAmount);
+            // Calculate's depositor's deposit amount based on the withdrawn amount
+            withdrawDepositAmount = amount
+                .mul(depositor.depositAmount[lpTokenAddress])
+                .div(totalAmount);
 
-        //     // Update pool's balance, borrow and stake amount
-        //     pool.balanceAmount += withdrawDebtAmount;
-        //     pool.borrowAmount -= withdrawDebtAmount;
-        //     pool.stakeAmount -= _amount;
+            // Update pool's balance, borrow and stake amount
+            pool.balanceAmount += withdrawDebtAmount;
+            pool.borrowAmount -= withdrawDebtAmount;
+            pool.stakeAmount -= _amount;
 
-        //     // Update depositor's stake, debt and deposit amount
-        //     depositor.stakeAmount[lpTokenAddress] -= amount;
-        //     depositor.debtAmount[lpTokenAddress] -= withdrawDebtAmount;
-        //     depositor.depositAmount[lpTokenAddress] -= withdrawDepositAmount;
-        // }
+            // Update depositor's stake, debt and deposit amount
+            depositor.stakeAmount[lpTokenAddress] -= amount;
+            depositor.debtAmount[lpTokenAddress] -= withdrawDebtAmount;
+            depositor.depositAmount[lpTokenAddress] -= withdrawDepositAmount;
+        }
 
-        // // Transfer user's withdraw token
-        // IERC20(pool.tokenAddress).safeApprove(
-        //     msg.sender,
-        //     withdrawDepositAmount
-        // );
-        // IERC20(pool.tokenAddress).safeTransfer(
-        //     msg.sender,
-        //     withdrawDepositAmount
-        // );
+        // Transfer user's withdraw token
+        IERC20(pool.tokenAddress).safeApprove(
+            msg.sender,
+            withdrawDepositAmount
+        );
+        IERC20(pool.tokenAddress).safeTransfer(
+            msg.sender,
+            withdrawDepositAmount
+        );
 
-        // emit WithdrawFromAave(msg.sender, withdrawDepositAmount);
+        emit WithdrawFromAave(msg.sender, withdrawDepositAmount);
     }
 }
