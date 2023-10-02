@@ -51,6 +51,7 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_supplyToken() public {
+        uint8 leverageRate = 4;
         uint256 amount = 1000;
 
         CompoundFacet compFacet = CompoundFacet(address(diamond));
@@ -60,26 +61,26 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposits 100 USDC to Compound, without creating account.
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        compFacet.supplyToken(1, amount.toE6());
+        compFacet.supplyToken(1, leverageRate, amount.toE6());
 
         // Alice creates account and deposit 1000 DAI to Compound, but trying with unsupported token, should revert.
         accFactory.createAccount();
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        compFacet.supplyToken(3, amount.toE6());
+        compFacet.supplyToken(3, leverageRate, amount.toE6());
 
         // Alice deposits 0 USDC to Compound, should revert
         vm.expectRevert(BaseFacet.InvalidSupplyAmount.selector);
-        compFacet.supplyToken(1, 0);
+        compFacet.supplyToken(1, leverageRate, 0);
 
         uint256 aliceUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(alice);
         // Alice tries to deposit more amount than his balance, should revert
         vm.expectRevert(BaseFacet.InsufficientUserBalance.selector);
-        compFacet.supplyToken(1, aliceUsdcBalance + 1);
+        compFacet.supplyToken(1, leverageRate, aliceUsdcBalance + 1);
 
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(compFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
-        compFacet.supplyToken(1, amount.toE6());
+        compFacet.supplyToken(1, leverageRate, amount.toE6());
 
         vm.stopPrank();
 
@@ -88,11 +89,12 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.startPrank(alice);
         IERC20(USDC_ADDRESS).safeApprove(address(compFacet), amount.toE6());
-        compFacet.supplyToken(1, amount.toE6());
+        compFacet.supplyToken(1, leverageRate, amount.toE6());
         vm.stopPrank();
     }
 
     function test_redeemCErc20Tokens() public {
+        uint8 leverageRate = 4;
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -112,7 +114,7 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposits 1000 USDC to Compound for leverage
         IERC20(USDC_ADDRESS).safeApprove(address(compFacet), amount.toE6());
-        compFacet.supplyToken(1, amount.toE6());
+        compFacet.supplyToken(1, leverageRate, amount.toE6());
 
         //Alice withdraw 1000 DAI from Compound, but it's not supported, should revert
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);

@@ -16,17 +16,20 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
     /**
     @dev Deposits the specified amount of tokens into the specified Curve pool with leverage.
     @param _poolIndex The index of the Curve pool to deposit into.
+    @param _leverageRate The Leverage rate
     @param _crvData The data of the Curve pool to deposit into.
     @param _amount The amount of tokens to deposit.
     */
     function depositToCurve(
         uint8 _poolIndex,
+        uint8 _leverageRate,
         CurveData calldata _crvData,
         uint256 _amount
     )
         external
         onlyRegisteredAccount
         onlySupportedPool(_poolIndex)
+        onlySupportedLeverageRate(_leverageRate)
         noReentrant
         returns (uint256)
     {
@@ -47,7 +50,7 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
             revert InsufficientUserBalance();
 
         // Calculates the leverage amount based on user's deposit amount.
-        uint256 leverageAmount = _amount.mul(LibFarmStorage.LEVERAGE_LEVEL);
+        uint256 leverageAmount = _amount.mul(_leverageRate);
 
         // If pool hasn't enough balance for leverage amount, should revert
         if (pool.balanceAmount < leverageAmount)

@@ -48,6 +48,7 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_depositToAave() public {
+        uint8 leverageRate = 3;
         uint256 amount = 1000;
 
         AaveFacet aveFacet = AaveFacet(address(diamond));
@@ -57,26 +58,26 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposits 100 USDC to Aave, without creating account.
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        aveFacet.depositToAave(1, amount.toE6());
+        aveFacet.depositToAave(1, leverageRate, amount.toE6());
 
         // Alice creates account and deposit 1000 DAI to Aave, but trying with unsupported token, should revert.
         accFactory.createAccount();
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        aveFacet.depositToAave(3, amount.toE6());
+        aveFacet.depositToAave(3, leverageRate, amount.toE6());
 
         // Alice deposits 0 USDC to Aave, should revert
         vm.expectRevert(BaseFacet.InvalidDepositAmount.selector);
-        aveFacet.depositToAave(1, 0);
+        aveFacet.depositToAave(1, leverageRate, 0);
 
         uint256 aliceUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(alice);
         // Alice tries to deposit more amount than his balance, should revert
         vm.expectRevert(BaseFacet.InsufficientUserBalance.selector);
-        aveFacet.depositToAave(1, aliceUsdcBalance + 1);
+        aveFacet.depositToAave(1, leverageRate, aliceUsdcBalance + 1);
 
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(aveFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
-        aveFacet.depositToAave(1, amount.toE6());
+        aveFacet.depositToAave(1, leverageRate, amount.toE6());
 
         vm.stopPrank();
 
@@ -85,11 +86,13 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.startPrank(alice);
         IERC20(USDC_ADDRESS).safeApprove(address(aveFacet), amount.toE6());
-        aveFacet.depositToAave(1, amount.toE6());
+        aveFacet.depositToAave(1, leverageRate, amount.toE6());
         vm.stopPrank();
     }
 
     function test_withdrawFromAave() public {
+        uint8 leverageRate = 3;
+
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -110,7 +113,7 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposit 1000 USDC to Aave for leverage
         IERC20(USDC_ADDRESS).safeApprove(address(aveFacet), amount.toE6());
-        aveFacet.depositToAave(1, amount.toE6());
+        aveFacet.depositToAave(1, leverageRate, amount.toE6());
 
         // Alice withdraw 1000 DAI from Aave, but it's not supported, should revert
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);

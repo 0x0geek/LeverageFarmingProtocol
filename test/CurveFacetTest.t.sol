@@ -57,6 +57,7 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_depositToCurve() public {
+        uint8 leverageRate = 2;
         uint256 amount = 1000;
 
         CurveFacet crvFacet = CurveFacet(address(diamond));
@@ -66,16 +67,16 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposits 100 USDC to Aave, without creating account.
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        crvFacet.depositToCurve(1, testCrvData, amount.toE6());
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, amount.toE6());
 
         // Alice creates account and deposit 1000 DAI to Curve, but trying with unsupported token, should revert.
         accFactory.createAccount();
         vm.expectRevert(BaseFacet.InvalidPool.selector);
-        crvFacet.depositToCurve(0, testCrvData, amount.toE6());
+        crvFacet.depositToCurve(0, leverageRate, testCrvData, amount.toE6());
 
         // Alice deposits 0 USDC to Curve, should revert
         vm.expectRevert(BaseFacet.InvalidDepositAmount.selector);
-        crvFacet.depositToCurve(1, testCrvData, 0);
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, 0);
 
         uint256 aliceUsdcBalance = IERC20(USDC_ADDRESS).balanceOf(alice);
         IERC20(USDC_ADDRESS).safeApprove(
@@ -84,12 +85,17 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
         );
         // Alice tries to deposit more amount than his balance, should revert
         vm.expectRevert(BaseFacet.InsufficientUserBalance.selector);
-        crvFacet.depositToCurve(1, testCrvData, aliceUsdcBalance + 1);
+        crvFacet.depositToCurve(
+            1,
+            leverageRate,
+            testCrvData,
+            aliceUsdcBalance + 1
+        );
 
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(crvFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
-        crvFacet.depositToCurve(1, testCrvData, amount.toE6());
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, amount.toE6());
 
         vm.stopPrank();
 
@@ -98,11 +104,13 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.startPrank(alice);
         IERC20(USDC_ADDRESS).safeApprove(address(crvFacet), amount.toE6());
-        crvFacet.depositToCurve(1, testCrvData, amount.toE6());
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, amount.toE6());
         vm.stopPrank();
     }
 
     function test_withdrawFromCurve() public {
+        uint8 leverageRate = 2;
+
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -123,7 +131,7 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
 
         // Alice deposit 1000 USDC to Curve for leverage
         IERC20(USDC_ADDRESS).safeApprove(address(crvFacet), amount.toE6());
-        crvFacet.depositToCurve(1, testCrvData, amount.toE6());
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, amount.toE6());
 
         // Alice withdraw 1000 DAI from Curve, but it's not supported, should revert
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);

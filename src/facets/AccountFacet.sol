@@ -73,7 +73,7 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
         address _user,
         uint8 _poolIndex,
         uint256 _amount
-    ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
+    ) external onlySupportedPool(_poolIndex) noReentrant {
         // User can't liquidate his one.
         if (_user == msg.sender) revert InvalidLiquidateUser();
 

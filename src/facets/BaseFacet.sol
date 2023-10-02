@@ -45,6 +45,7 @@ contract BaseFacet {
     error InvalidSupplyAmount();
     error InvalidPool();
     error NoReward();
+    error InvalidLeverageRate();
 
     modifier onlyRegisteredAccount() {
         checkExistAccount(msg.sender);
@@ -63,6 +64,11 @@ contract BaseFacet {
 
     modifier onlySupportedPool(uint8 _poolIndex) {
         checkIfSupportedPool(_poolIndex);
+        _;
+    }
+
+    modifier onlySupportedLeverageRate(uint8 _leverageRate) {
+        checkIfSupportedLeverageRate(_leverageRate);
         _;
     }
 
@@ -101,6 +107,13 @@ contract BaseFacet {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 
         if (fs.pools[_poolIndex].supported == false) revert NotSupportedToken();
+    }
+
+    function checkIfSupportedLeverageRate(
+        uint8 _leverageRate
+    ) internal view virtual {
+        if (_leverageRate == 0 || _leverageRate > 5)
+            revert InvalidLeverageRate();
     }
 
     function checkIfSupportedToken(

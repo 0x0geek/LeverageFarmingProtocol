@@ -17,15 +17,18 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
     /**
     @dev Allows a registered account to supply tokens to Compound.
     @param _poolIndex The index of the pool to supply tokens to.
+    @param _leverageRate The Leverage Rate.
     @param _amountToSupply The amount of tokens to supply.
     **/
     function supplyToken(
         uint8 _poolIndex,
+        uint8 _leverageRate,
         uint256 _amountToSupply
     )
         external
         onlyRegisteredAccount
         onlySupportedPool(_poolIndex)
+        onlySupportedLeverageRate(_leverageRate)
         noReentrant
         returns (uint)
     {
@@ -45,9 +48,7 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
 
         {
             // Calculate's leverage amount based on user's deposit amount
-            uint256 leverageAmount = _amountToSupply.mul(
-                LibFarmStorage.LEVERAGE_LEVEL
-            );
+            uint256 leverageAmount = _amountToSupply.mul(_leverageRate);
 
             // If pool hasn't enough balance, should revert
             if (pool.balanceAmount < leverageAmount)

@@ -17,12 +17,20 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
     /**
     @dev Allows a registered account to deposit tokens into an Aave pool.
     @param _poolIndex The index of the pool to deposit into.
+    @param _leverageRate The Leverage Rate.
     @param _amount The amount of tokens to deposit.
     **/
     function depositToAave(
         uint8 _poolIndex,
+        uint8 _leverageRate,
         uint256 _amount
-    ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
+    )
+        external
+        onlyRegisteredAccount
+        onlySupportedPool(_poolIndex)
+        onlySupportedLeverageRate(_leverageRate)
+        noReentrant
+    {
         // If user tries to deposit zero amount, should revert
         if (_amount == 0) revert InvalidDepositAmount();
 
@@ -36,7 +44,7 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
             revert InsufficientUserBalance();
 
         // Calculate leverage amount based on user's deposit amount
-        uint256 leverageAmount = _amount.mul(LibFarmStorage.LEVERAGE_LEVEL);
+        uint256 leverageAmount = _amount.mul(_leverageRate);
         uint256 depositAmount = _amount.add(leverageAmount);
 
         // If pool hasn't sufficient balance, should revert
