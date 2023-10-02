@@ -38,6 +38,18 @@ contract BaseSetup is Test {
     address internal constant COMPTROLLER_ADDRESS =
         0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B;
 
+    address internal constant AAVE_POOL_LP_TOKEN_ADDRESS =
+        0xFd2a8fA60Abd58Efe3EeE34dd494cD491dC14900;
+    address internal constant AAVE_POOL_ADDRESS =
+        0xDeBF20617708857ebe4F679508E7b7863a8A8EeE;
+    address internal constant AAVE_LIQUIDITY_GAUGE_ADDRESS =
+        0xd662908ADA2Ea1916B3318327A97eB18aD588b5d;
+
+    address internal constant CRV_TOKEN_ADDRESS =
+        0xD533a949740bb3306d119CC777fa900bA034cd52;
+    address internal constant CRV_TOKEN_MINTER_ADDRESS =
+        0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
+
     uint256 internal constant ETHER_DECIMAL = 1e18;
 
     // Skip forward block.timestamp for 3 days.

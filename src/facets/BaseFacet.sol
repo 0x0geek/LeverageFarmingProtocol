@@ -44,6 +44,7 @@ contract BaseFacet {
     error NotAvailableForWithdraw();
     error InvalidDepositAmount();
     error InvalidSupplyAmount();
+    error InvalidPool();
     error NoReward();
 
     modifier onlyRegisteredAccount() {

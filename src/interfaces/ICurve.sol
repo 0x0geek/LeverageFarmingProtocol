@@ -1,10 +1,20 @@
-// SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 interface ICurveMinter {
     function mint_for(address, address) external;
 
     function mint(address) external;
+}
+
+interface ICurveToken {
+    function approve(address, uint256) external returns (bool);
+
+    function balanceOf(address) external returns (uint256);
+
+    function transfer(address, uint256) external returns (bool);
+
+    function transferFrom(address, address, uint256) external returns (bool);
 }
 
 interface ICurvePool {
@@ -19,10 +29,11 @@ interface ICurvePool {
         uint256
     ) external returns (uint256);
 
-    function remove_liquidity(
+    function remove_liquidity_one_coin(
         uint256,
-        uint256[3] memory
-    ) external returns (uint256[3] memory);
+        int128,
+        uint256
+    ) external returns (uint256);
 
     function lp_token() external returns (address);
 }
@@ -43,4 +54,11 @@ interface ILiquidityGauge {
     function integrate_fraction(
         address _account
     ) external view returns (uint256);
+}
+
+struct CurveData {
+    address poolAddress;
+    address gaugeAddress;
+    address minterAddress;
+    address lpTokenAddress;
 }

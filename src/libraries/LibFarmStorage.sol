@@ -27,6 +27,12 @@ library LibFarmStorage {
     address public constant AETHER_ADDRESS =
         0x030bA81f1c18d280636F32af80b9AAd02Cf0854e;
 
+    address internal constant AAVE_POOL_LP_TOKEN_ADDRESS =
+        0xFd2a8fA60Abd58Efe3EeE34dd494cD491dC14900;
+
+    address internal constant CRV_TOKEN_ADDRESS =
+        0xD533a949740bb3306d119CC777fa900bA034cd52;
+
     uint256 internal constant USDC_DECIMAL = 1e6;
 
     uint256 public constant LEVERAGE_LEVEL = 5;
@@ -38,6 +44,7 @@ library LibFarmStorage {
         address tokenAddress;
         address cTokenAddress;
         address aTokenAddress;
+        address crvLpTokenAddress;
         uint256 balanceAmount;
         uint256 interestAmount;
         uint256 borrowAmount;

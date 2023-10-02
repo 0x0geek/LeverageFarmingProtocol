@@ -14,6 +14,10 @@ contract AccountFactoryFacet is BaseFacet, ReEntrancyGuard {
     event AccountCreated(address indexed);
     error AccountAlreadyExist();
 
+    /**
+    @dev Creates a new account for the specified user.
+    @param _user The address of the user to create an account for.
+    */
     function createAccount(address _user) external {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 

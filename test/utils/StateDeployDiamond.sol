@@ -7,7 +7,11 @@ pragma solidity ^0.8.0;
 * Abstract Contracts for the shared setup of the tests
 /******************************************************************************/
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "../../src/interfaces/IDiamondCut.sol";
+import "../../src/interfaces/IAccountFactory.sol";
 import "../../src/facets/DiamondCutFacet.sol";
 import "../../src/facets/DiamondLoupeFacet.sol";
 import "../../src/facets/OwnershipFacet.sol";
@@ -19,11 +23,16 @@ import "../../src/facets/AccountFactoryFacet.sol";
 import "../../src/facets/LeverageFarmingFacet.sol";
 
 import "../../src/Diamond.sol";
+import "./../utils/Math.sol";
+
 import "./HelperContract.sol";
 
 import "forge-std/console.sol";
 
 abstract contract StateDeployDiamond is HelperContract {
+    using SafeERC20 for IERC20;
+    using Math for uint256;
+
     //contract types of facets to be deployed
     Diamond diamond;
 
@@ -93,5 +102,20 @@ abstract contract StateDeployDiamond is HelperContract {
 
         // deploy diamond
         diamond = new Diamond(diamondFacetCutList, _args);
+    }
+
+    function depositTokenToPool(
+        address _accFactory,
+        address _token,
+        address _user,
+        uint256 _amount
+    ) internal {
+        AccountFacet accFacet = AccountFacet(address(diamond));
+        // User creates his account and deposit 5000 USDC to USDC pool.
+        vm.startPrank(_user);
+        IAccountFactory(_accFactory).createAccount();
+        IERC20(_token).safeApprove(address(accFacet), _amount.toE6());
+        accFacet.deposit(1, _amount.toE6());
+        vm.stopPrank();
     }
 }

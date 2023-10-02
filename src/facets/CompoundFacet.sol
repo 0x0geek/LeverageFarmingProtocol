@@ -14,64 +14,76 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
     event TokenSupplied(uint _mintResult, uint256 _amount);
     event RedeemFinished(uint256 _redeemResult, uint256 _amount);
 
+    /**
+    @dev Allows a registered account to supply tokens to Compound.
+    @param _poolIndex The index of the pool to supply tokens to.
+    @param _amountToSupply The amount of tokens to supply.
+    **/
     function supplyToken(
-        address _tokenAddress,
+        uint8 _poolIndex,
         uint256 _amountToSupply
     )
         external
         onlyRegisteredAccount
-        onlySupportedToken(_tokenAddress)
+        onlySupportedPool(_poolIndex)
         noReentrant
         returns (uint)
     {
+        // If user tries to supply zero amount, should revert
         if (_amountToSupply == 0) revert InvalidSupplyAmount();
 
-        IERC20 underlyingToken = IERC20(_tokenAddress);
-
-        if (underlyingToken.balanceOf(msg.sender) < _amountToSupply)
-            revert InsufficientUserBalance();
-
-        uint8 poolIndex = getPoolIndexFromToken(_tokenAddress);
-
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        LibFarmStorage.Pool storage pool = fs.pools[poolIndex];
+
+        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
+
+        // If user hasn't enough balance, should revert
+        if (IERC20(pool.tokenAddress).balanceOf(msg.sender) < _amountToSupply)
+            revert InsufficientUserBalance();
 
         address cTokenAddress;
         uint256 depositAmount;
 
         {
+            // Calculate's leverage amount based on user's deposit amount
             uint256 leverageAmount = _amountToSupply.mul(
                 LibFarmStorage.LEVERAGE_LEVEL
             );
 
+            // If pool hasn't enough balance, should revert
             if (pool.balanceAmount < leverageAmount)
                 revert InsufficientPoolBalance();
 
+            // Calculates deposit amount based on leverage amount and user's deposit amount
             depositAmount = _amountToSupply + leverageAmount;
-            // Transfer tokens from sender to this contract
-            underlyingToken.safeTransferFrom(
+
+            // Transfer tokens from sender to this contract (Diamond proxy)
+            IERC20(pool.tokenAddress).safeTransferFrom(
                 msg.sender,
                 address(this),
                 _amountToSupply
             );
 
             LibFarmStorage.Depositor storage depositor = fs.depositors[
-                poolIndex
+                _poolIndex
             ][msg.sender];
 
             cTokenAddress = pool.cTokenAddress;
 
+            // Update pool's balance and borrow amount
             pool.balanceAmount -= leverageAmount;
             pool.borrowAmount += leverageAmount;
 
+            // Store the current CToken exchange rate
             depositor.exchangeRate = CErc20(cTokenAddress)
                 .exchangeRateCurrent();
+
+            // Update depositor's deposit and debt amount
             depositor.depositAmount[cTokenAddress] += _amountToSupply;
             depositor.debtAmount[cTokenAddress] += leverageAmount;
         }
 
         // Approve transfer on the ERC20 contract
-        underlyingToken.safeApprove(cTokenAddress, depositAmount);
+        IERC20(pool.tokenAddress).safeApprove(cTokenAddress, depositAmount);
 
         uint256 balanceBeforeMint;
         uint256 balanceDiff;
@@ -81,21 +93,26 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
             // Create a reference to the corresponding cToken contract, like cUSDC, cUSDT
             CErc20 cToken = CErc20(cTokenAddress);
 
+            // Get the CToken balance before mint
             balanceBeforeMint = cToken.balanceOf(address(this));
 
             // Mint cTokens
             mintResult = cToken.mint(depositAmount);
 
+            // Get the minted amount based on the current balance and the previous one
             balanceDiff = cToken.balanceOf(address(this)) - balanceBeforeMint;
         }
 
         {
             LibFarmStorage.Depositor storage depositor = fs.depositors[
-                poolIndex
+                _poolIndex
             ][msg.sender];
+
+            // Update depositor's stake amount
             depositor.stakeAmount[cTokenAddress] += balanceDiff;
         }
 
+        // Update pool's stake amount
         pool.stakeAmount += balanceDiff;
 
         emit TokenSupplied(mintResult, depositAmount);
@@ -103,86 +120,116 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
         return mintResult;
     }
 
+    /**
+    @dev Allows a registered account to redeem cTokens from Compound and receive the underlying asset in return.
+    @param _poolIndex The index of the pool to redeem cTokens from.
+    @param _amount The amount of cTokens to redeem.
+    @param redeemType The type of redeem operation to perform. If true, redeem by cToken amount. If false, redeem by underlying asset amount.
+    **/
     function redeemCErc20Tokens(
-        address _cTokenAddress,
+        uint8 _poolIndex,
         uint256 _amount,
         bool redeemType
     )
         external
         onlyRegisteredAccount
-        onlySupportedCToken(_cTokenAddress)
+        onlySupportedPool(_poolIndex)
         noReentrant
         returns (bool)
     {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        LibFarmStorage.Pool storage pool;
-        LibFarmStorage.Depositor storage depositor;
+        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
+        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
+            msg.sender
+        ];
 
-        {
-            uint8 poolIndex = getPoolIndexFromCToken(_cTokenAddress);
-
-            pool = fs.pools[poolIndex];
-            depositor = fs.depositors[poolIndex][msg.sender];
-        }
-
-        if (depositor.stakeAmount[_cTokenAddress] < _amount)
+        // If user's stake amount (CToken amount) hasn't enough for withdraw, should revert
+        if (depositor.stakeAmount[pool.cTokenAddress] < _amount)
             revert InsufficientUserBalance();
 
-        uint256 withdrawAmount;
-        uint256 withdrawDebtAmount;
+        uint256 withdrawDepositAmount;
 
         {
-            // Create a reference to the corresponding cToken contract, like cUSDC, cUSDT
-            if (CErc20(_cTokenAddress).balanceOf(address(this)) < _amount)
+            // If pool's CToken amount hasn't enough balance, should revert
+            if (CErc20(pool.cTokenAddress).balanceOf(address(this)) < _amount)
                 revert InsufficientPoolBalance();
 
-            uint256 totalAmount = depositor.debtAmount[_cTokenAddress].add(
-                depositor.depositAmount[_cTokenAddress]
+            // Calculates depositor's total debt amount
+            uint256 totalAmount = depositor.debtAmount[pool.cTokenAddress].add(
+                depositor.depositAmount[pool.cTokenAddress]
             );
 
-            withdrawAmount = _amount
-                .mul(CErc20(_cTokenAddress).exchangeRateCurrent())
+            // Calculate total token amount based on the current exchange rate
+            uint256 withdrawAmount = _amount
+                .mul(CErc20(pool.cTokenAddress).exchangeRateCurrent())
                 .div(1e18);
 
-            withdrawDebtAmount = withdrawAmount
-                .mul(depositor.debtAmount[_cTokenAddress])
+            // Calculate user's token amount based on total amount and user's deposit amount
+            withdrawDepositAmount = withdrawAmount
+                .mul(depositor.depositAmount[pool.cTokenAddress])
                 .div(totalAmount);
 
-            depositor.stakeAmount[_cTokenAddress] -= _amount;
-            depositor.depositAmount[_cTokenAddress] -= withdrawAmount
-                .mul(depositor.depositAmount[_cTokenAddress])
-                .div(totalAmount);
-            depositor.debtAmount[_cTokenAddress] -= withdrawDebtAmount;
+            // Update user's stake amount and deposit amount
+            depositor.stakeAmount[pool.cTokenAddress] -= _amount;
+            depositor.depositAmount[
+                pool.cTokenAddress
+            ] -= withdrawDepositAmount;
 
-            uint256 totalRewardAmount = withdrawAmount.sub(
-                _amount.mul(depositor.exchangeRate).div(1e18)
-            );
+            {
+                // Calcualte user's debt amount based on total amount and user's debt amount
+                uint256 withdrawDebtAmount = withdrawAmount
+                    .mul(depositor.debtAmount[pool.cTokenAddress])
+                    .div(totalAmount);
 
-            if (totalRewardAmount > 0) {
-                uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
-                    pool.stakeAmount
+                // Update user's debt amount
+                depositor.debtAmount[pool.cTokenAddress] -= withdrawDebtAmount;
+
+                // Update pool's balance, borrow and stake amount
+                pool.balanceAmount += withdrawDebtAmount;
+                pool.borrowAmount -= withdrawDebtAmount;
+                pool.stakeAmount -= _amount;
+            }
+
+            {
+                // Calculate total reward based on the current change rate
+                uint256 totalRewardAmount = withdrawAmount.sub(
+                    _amount.mul(depositor.exchangeRate).div(1e18)
                 );
 
-                uint256 lpReward = rewardAmount.mul(fs.interestRate).div(100);
+                if (totalRewardAmount > 0) {
+                    // Calculate user's total reward
+                    uint256 lpReward = totalRewardAmount
+                        .mul(fs.interestRate)
+                        .div(100);
 
-                pool.rewardAmount += lpReward;
-                depositor.rewardAmount += rewardAmount.sub(lpReward);
+                    // Update Liquidity provider's reward
+                    pool.balanceAmount += lpReward;
+
+                    // Update depositor's reward (reward - lpreward);
+                    depositor.rewardAmount += totalRewardAmount.sub(lpReward);
+                }
             }
         }
-
-        pool.balanceAmount += withdrawDebtAmount;
-        pool.borrowAmount -= withdrawDebtAmount;
-        pool.stakeAmount -= _amount;
 
         uint256 redeemResult;
 
         if (redeemType == true) {
-            // Retrieve your asset based on a cToken amount
-            redeemResult = CErc20(_cTokenAddress).redeem(_amount);
+            // Retrieve user's asset based on a cToken amount
+            redeemResult = CErc20(pool.cTokenAddress).redeem(_amount);
         } else {
-            // Retrieve your asset based on an amount of the asset
-            redeemResult = CErc20(_cTokenAddress).redeemUnderlying(_amount);
+            // Retrieve user's asset based on an amount of the asset
+            redeemResult = CErc20(pool.cTokenAddress).redeemUnderlying(_amount);
         }
+
+        // Send tokens to user
+        IERC20(pool.tokenAddress).safeApprove(
+            msg.sender,
+            withdrawDepositAmount
+        );
+        IERC20(pool.tokenAddress).safeTransfer(
+            msg.sender,
+            withdrawDepositAmount
+        );
 
         emit RedeemFinished(redeemResult, _amount);
 

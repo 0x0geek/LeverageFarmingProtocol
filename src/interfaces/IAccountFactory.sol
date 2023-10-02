@@ -3,4 +3,6 @@ pragma solidity 0.8.20;
 
 interface IAccountFactory {
     function setFacetAddrs(address[] memory _facetAddrs) external;
+
+    function createAccount() external;
 }

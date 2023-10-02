@@ -21,6 +21,11 @@ contract AccountFactory is
 
     error InvalidAddress();
 
+    /**
+    @dev Initializes the contract by setting the `diamond` address to the address passed as an argument.
+    @dev Checks if the address is valid or not.
+    @param _diamondAddress The address of the diamond contract.
+    */
     function initialize(address _diamondAddress) external initializer {
         if (_diamondAddress == address(0)) revert InvalidAddress();
 
@@ -28,6 +33,9 @@ contract AccountFactory is
         diamond = _diamondAddress;
     }
 
+    /**
+    @dev Creates an account using the `AccountFactoryFacet` contract.
+    */
     function createAccount() external {
         AccountFactoryFacet(diamond).createAccount(msg.sender);
     }
