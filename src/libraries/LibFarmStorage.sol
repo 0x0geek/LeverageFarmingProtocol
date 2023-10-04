@@ -35,7 +35,7 @@ library LibFarmStorage {
 
     uint256 internal constant USDC_DECIMAL = 1e6;
 
-    uint256 public constant LEVERAGE_LEVEL = 5;
+    uint256 public constant MAX_LEVERAGE_LEVEL = 5;
     uint8 public constant COLLATERAL_FACTOR = 83;
     uint8 public constant MAX_POOL_LENGTH = 3;
     uint8 public constant LIQUIDATE_FEE = 110;
@@ -48,13 +48,13 @@ library LibFarmStorage {
         uint256 balanceAmount;
         uint256 interestAmount;
         uint256 borrowAmount;
-        uint256 stakeAmount;
+        mapping(address => uint256) stakeAmount;
         uint256 assetAmount;
         uint256 rewardAmount;
         bool supported;
     }
 
-    struct Depositor {
+    struct Deposit {
         uint256 amount;
         uint256 assetAmount;
         uint256 rewardAmount;
@@ -68,7 +68,7 @@ library LibFarmStorage {
         bool initialized;
         mapping(uint8 => Pool) pools;
         mapping(address => bool) accounts;
-        mapping(uint8 => mapping(address => Depositor)) depositors;
+        mapping(address => mapping(uint8 => Deposit)) deposits;
         uint8 interestRate;
         uint8 collateralFactor;
         address owner;

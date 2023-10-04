@@ -111,18 +111,16 @@ contract LeverageFarmingFacet is BaseFacet, ReentrancyGuard {
         address _aToken
     ) internal {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        fs.pools[_poolIndex] = LibFarmStorage.Pool({
-            tokenAddress: _token,
-            cTokenAddress: _cToken,
-            aTokenAddress: _aToken,
-            crvLpTokenAddress: _crvLpToken,
-            balanceAmount: 0,
-            interestAmount: 0,
-            borrowAmount: 0,
-            stakeAmount: 0,
-            assetAmount: 0,
-            rewardAmount: 0,
-            supported: true
-        });
+        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
+        pool.tokenAddress = _token;
+        pool.cTokenAddress = _cToken;
+        pool.aTokenAddress = _aToken;
+        pool.crvLpTokenAddress = _crvLpToken;
+        pool.balanceAmount = 0;
+        pool.interestAmount = 0;
+        pool.borrowAmount = 0;
+        pool.assetAmount = 0;
+        pool.rewardAmount = 0;
+        pool.supported = true;
     }
 }

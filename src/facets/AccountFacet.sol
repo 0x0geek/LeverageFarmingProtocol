@@ -53,71 +53,72 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
         pool.assetAmount += assetAmount;
         pool.balanceAmount += _amount;
 
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
-        // Calculate depositor's asset and balance amount
-        depositor.amount += _amount;
-        depositor.assetAmount += assetAmount;
+        // Calculate deposit's asset and balance amount
+        deposit.amount += _amount;
+        deposit.assetAmount += assetAmount;
         emit Deposit(msg.sender, _poolIndex, _amount);
     }
 
     /**
     @dev Allows a registered account to liquidate another account's debt in a supported pool.
     @param _user The address of the account to be liquidated.
-    @param _poolIndex The index of the pool to liquidate in.
     @param _amount The amount of tokens to use for liquidation.
     **/
     function liquidate(
         address _user,
-        uint8 _poolIndex,
-        uint256 _amount
-    ) external onlySupportedPool(_poolIndex) noReentrant {
+        uint256 _amount,
+        address _collateral
+    ) external onlySupportedCollateral(_collateral) noReentrant {
         // User can't liquidate his one.
         if (_user == msg.sender) revert InvalidLiquidateUser();
 
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            _user
-        ];
-        LibFarmStorage.Depositor storage liquidator = fs.depositors[_poolIndex][
-            msg.sender
-        ];
-        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-
-        address token = pool.tokenAddress;
-
-        // Calculate user's health ratio
-        uint256 healthRatio = (depositor.amount +
-            getUserDebt(_user, token, _poolIndex))
-            .div(depositor.debtAmount[token])
-            .mul(LibFarmStorage.COLLATERAL_FACTOR);
 
         // If health ratio is greater than 1, shouldn't be liquidated
-        if (healthRatio >= 100) revert InvalidLiquidate();
+        if (getHealthRatio(_user) >= 100) revert InvalidLiquidate();
 
         // If liquidator hasn't sufficient balance, should revert
-        if (_amount < depositor.debtAmount[token])
-            revert InsufficientLiquidateAmount();
+        if (_amount < getUserDebt(_user)) revert InsufficientLiquidateAmount();
 
         // Transfer tokens to diamond proxy for liquidattion
-        IERC20(pool.tokenAddress).safeTransferFrom(
+        IERC20(_collateral).safeTransferFrom(
             msg.sender,
             address(this),
             _amount
         );
 
         // Calculate liquidator's portion
-        uint256 liquidatePortion = depositor
-            .stakeAmount[token]
-            .mul(LibFarmStorage.LIQUIDATE_FEE)
-            .div(100);
 
-        // Update liquidator's portion
-        liquidator.stakeAmount[token] += liquidatePortion;
-        depositor.stakeAmount[token] -= liquidatePortion;
-        depositor.debtAmount[token] -= _amount;
+        uint256 portionForToken;
+
+        for (uint8 i; i != LibFarmStorage.MAX_POOL_LENGTH; ++i) {
+            LibFarmStorage.Pool storage pool = fs.pools[i];
+            LibFarmStorage.Deposit storage liquidator = fs.deposits[msg.sender][
+                i
+            ];
+            LibFarmStorage.Deposit storage deposit = fs.deposits[_user][i];
+
+            portionForToken = deposit
+                .stakeAmount[pool.aTokenAddress]
+                .mul(LibFarmStorage.LIQUIDATE_FEE)
+                .div(100);
+
+            // Update liquidator's portion
+            liquidator.stakeAmount[pool.aTokenAddress] += portionForToken;
+            deposit.stakeAmount[pool.aTokenAddress] -= portionForToken;
+
+            portionForToken = deposit
+                .stakeAmount[pool.cTokenAddress]
+                .mul(LibFarmStorage.LIQUIDATE_FEE)
+                .div(100);
+
+            liquidator.stakeAmount[pool.cTokenAddress] += portionForToken;
+            deposit.stakeAmount[pool.cTokenAddress] -= portionForToken;
+        }
     }
 
     /**
@@ -130,25 +131,25 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
         uint256 _amount
     ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
-        // get depositor's asset amount
-        uint256 assetAmount = depositor.assetAmount;
+        // get deposit's asset amount
+        uint256 assetAmount = deposit.assetAmount;
 
         // check if User has sufficient withdraw amount
         if (assetAmount == 0) revert ZeroAmountForWithdraw();
 
         // calculate user's amount based on his asset amount
         uint256 amount = calculateAmount(_poolIndex, assetAmount);
-        LibFarmStorage.Pool memory pool = fs.pools[_poolIndex];
+        LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
 
         // If pool hasnt sufficient balance for withdraw, should revert
         if (amount > pool.balanceAmount) revert NotAvailableForWithdraw();
 
-        // Update depositor's asset and pool's balance and asset amount
-        depositor.assetAmount -= assetAmount;
+        // Update deposit's asset and pool's balance and asset amount
+        deposit.assetAmount -= assetAmount;
         pool.balanceAmount -= amount;
         pool.assetAmount -= assetAmount;
 
@@ -167,21 +168,21 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
     ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
         // If user hasn't reward, should revert
-        if (depositor.rewardAmount == 0) revert NoReward();
+        if (deposit.rewardAmount == 0) revert NoReward();
 
-        // Update depositor's reward amount
-        depositor.rewardAmount = 0;
+        // Update deposit's reward amount
+        deposit.rewardAmount = 0;
 
-        // Transfer reward to depositor
+        // Transfer reward to deposit
         IERC20 token = IERC20(pool.tokenAddress);
-        token.safeApprove(msg.sender, depositor.rewardAmount);
-        token.safeTransfer(msg.sender, depositor.rewardAmount);
+        token.safeApprove(msg.sender, deposit.rewardAmount);
+        token.safeTransfer(msg.sender, deposit.rewardAmount);
 
-        emit ClaimReward(msg.sender, depositor.rewardAmount);
+        emit ClaimReward(msg.sender, deposit.rewardAmount);
     }
 }

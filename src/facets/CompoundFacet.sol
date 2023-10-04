@@ -43,6 +43,8 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
         if (IERC20(pool.tokenAddress).balanceOf(msg.sender) < _amountToSupply)
             revert InsufficientUserBalance();
 
+        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
+
         address cTokenAddress;
         uint256 depositAmount;
 
@@ -64,9 +66,9 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
                 _amountToSupply
             );
 
-            LibFarmStorage.Depositor storage depositor = fs.depositors[
+            LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
                 _poolIndex
-            ][msg.sender];
+            ];
 
             cTokenAddress = pool.cTokenAddress;
 
@@ -75,12 +77,11 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
             pool.borrowAmount += leverageAmount;
 
             // Store the current CToken exchange rate
-            depositor.exchangeRate = CErc20(cTokenAddress)
-                .exchangeRateCurrent();
+            deposit.exchangeRate = CErc20(cTokenAddress).exchangeRateCurrent();
 
-            // Update depositor's deposit and debt amount
-            depositor.depositAmount[cTokenAddress] += _amountToSupply;
-            depositor.debtAmount[cTokenAddress] += leverageAmount;
+            // Update deposit's deposit and debt amount
+            deposit.depositAmount[cTokenAddress] += _amountToSupply;
+            deposit.debtAmount[cTokenAddress] += leverageAmount;
         }
 
         // Approve transfer on the ERC20 contract
@@ -105,16 +106,16 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
         }
 
         {
-            LibFarmStorage.Depositor storage depositor = fs.depositors[
+            LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
                 _poolIndex
-            ][msg.sender];
+            ];
 
-            // Update depositor's stake amount
-            depositor.stakeAmount[cTokenAddress] += balanceDiff;
+            // Update deposit's stake amount
+            deposit.stakeAmount[cTokenAddress] += balanceDiff;
         }
 
         // Update pool's stake amount
-        pool.stakeAmount += balanceDiff;
+        pool.stakeAmount[cTokenAddress] += balanceDiff;
 
         emit TokenSupplied(mintResult, depositAmount);
 
@@ -140,12 +141,12 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
     {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
         // If user's stake amount (CToken amount) hasn't enough for withdraw, should revert
-        if (depositor.stakeAmount[pool.cTokenAddress] < _amount)
+        if (deposit.stakeAmount[pool.cTokenAddress] < _amount)
             revert InsufficientUserBalance();
 
         uint256 withdrawDepositAmount;
@@ -155,9 +156,9 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
             if (CErc20(pool.cTokenAddress).balanceOf(address(this)) < _amount)
                 revert InsufficientPoolBalance();
 
-            // Calculates depositor's total debt amount
-            uint256 totalAmount = depositor.debtAmount[pool.cTokenAddress].add(
-                depositor.depositAmount[pool.cTokenAddress]
+            // Calculates deposit's total debt amount
+            uint256 totalAmount = deposit.debtAmount[pool.cTokenAddress].add(
+                deposit.depositAmount[pool.cTokenAddress]
             );
 
             // Calculate total token amount based on the current exchange rate
@@ -167,34 +168,32 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
 
             // Calculate user's token amount based on total amount and user's deposit amount
             withdrawDepositAmount = withdrawAmount
-                .mul(depositor.depositAmount[pool.cTokenAddress])
+                .mul(deposit.depositAmount[pool.cTokenAddress])
                 .div(totalAmount);
 
             // Update user's stake amount and deposit amount
-            depositor.stakeAmount[pool.cTokenAddress] -= _amount;
-            depositor.depositAmount[
-                pool.cTokenAddress
-            ] -= withdrawDepositAmount;
+            deposit.stakeAmount[pool.cTokenAddress] -= _amount;
+            deposit.depositAmount[pool.cTokenAddress] -= withdrawDepositAmount;
 
             {
                 // Calcualte user's debt amount based on total amount and user's debt amount
                 uint256 withdrawDebtAmount = withdrawAmount
-                    .mul(depositor.debtAmount[pool.cTokenAddress])
+                    .mul(deposit.debtAmount[pool.cTokenAddress])
                     .div(totalAmount);
 
                 // Update user's debt amount
-                depositor.debtAmount[pool.cTokenAddress] -= withdrawDebtAmount;
+                deposit.debtAmount[pool.cTokenAddress] -= withdrawDebtAmount;
 
                 // Update pool's balance, borrow and stake amount
                 pool.balanceAmount += withdrawDebtAmount;
                 pool.borrowAmount -= withdrawDebtAmount;
-                pool.stakeAmount -= _amount;
+                pool.stakeAmount[pool.cTokenAddress] -= _amount;
             }
 
             {
                 // Calculate total reward based on the current change rate
                 uint256 totalRewardAmount = withdrawAmount.sub(
-                    _amount.mul(depositor.exchangeRate).div(1e18)
+                    _amount.mul(deposit.exchangeRate).div(1e18)
                 );
 
                 if (totalRewardAmount > 0) {
@@ -206,8 +205,8 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
                     // Update Liquidity provider's reward
                     pool.balanceAmount += lpReward;
 
-                    // Update depositor's reward (reward - lpreward);
-                    depositor.rewardAmount += totalRewardAmount.sub(lpReward);
+                    // Update deposit's reward (reward - lpreward);
+                    deposit.rewardAmount += totalRewardAmount.sub(lpReward);
                 }
             }
         }

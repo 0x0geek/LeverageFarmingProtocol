@@ -41,13 +41,15 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
 
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
         // If user hasn't enough balance for deposit, should revert
         if (IERC20(pool.tokenAddress).balanceOf(msg.sender) < _amount)
             revert InsufficientUserBalance();
+
+        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
 
         // Calculates the leverage amount based on user's deposit amount.
         uint256 leverageAmount = _amount.mul(_leverageRate);
@@ -60,9 +62,9 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
         pool.balanceAmount -= leverageAmount;
         pool.borrowAmount += leverageAmount;
 
-        // Updates depositor's deposit amount and debt amount
-        depositor.depositAmount[pool.crvLpTokenAddress] += _amount;
-        depositor.debtAmount[pool.crvLpTokenAddress] += leverageAmount;
+        // Updates deposit's deposit amount and debt amount
+        deposit.depositAmount[pool.crvLpTokenAddress] += _amount;
+        deposit.debtAmount[pool.crvLpTokenAddress] += leverageAmount;
 
         // Transfer tokens from sender to this contract (Diamond proxy contract)
         IERC20(pool.tokenAddress).safeTransferFrom(
@@ -93,11 +95,11 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
                 true
             );
 
-        // Update depositor's stake amount
-        depositor.stakeAmount[pool.crvLpTokenAddress] += lpTokenAmount;
+        // Update deposit's stake amount
+        deposit.stakeAmount[pool.crvLpTokenAddress] += lpTokenAmount;
 
         // Update pool's stake amount
-        pool.stakeAmount += lpTokenAmount;
+        pool.stakeAmount[pool.crvLpTokenAddress] += lpTokenAmount;
 
         // Approve lp tokens to CRV pool gauge to get reward from Curve
         IERC20(_crvData.lpTokenAddress).safeApprove(
@@ -130,22 +132,23 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
     ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
         address lpTokenAddress = _crvData.lpTokenAddress;
 
         // If user hasn't enough balance for lp token, should revert.
-        if (depositor.stakeAmount[lpTokenAddress] < _amount)
+        if (deposit.stakeAmount[lpTokenAddress] < _amount)
             revert InsufficientUserBalance();
 
         // If pool hasn't enough balance for withdraw, should revert
-        if (pool.stakeAmount < _amount) revert InsufficientPoolBalance();
+        if (pool.stakeAmount[lpTokenAddress] < _amount)
+            revert InsufficientPoolBalance();
 
-        // Calculates depositor's total debt amount
-        uint256 totalAmount = depositor.debtAmount[lpTokenAddress].add(
-            depositor.depositAmount[lpTokenAddress]
+        // Calculates deposit's total debt amount
+        uint256 totalAmount = deposit.debtAmount[lpTokenAddress].add(
+            deposit.depositAmount[lpTokenAddress]
         );
 
         {
@@ -159,9 +162,9 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
                 .balanceOf(address(this));
 
             if (totalRewardAmount > 0) {
-                // Calculate depositor's reward based on his deposit amount and pool's total stake amount
+                // Calculate deposit's reward based on his deposit amount and pool's total stake amount
                 uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
-                    pool.stakeAmount
+                    pool.stakeAmount[lpTokenAddress]
                 );
 
                 // Calculates Liquidity provider's reward from the reward.
@@ -170,8 +173,8 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
                 // Update Liquidity provider's reward
                 pool.rewardAmount += lpReward;
 
-                // Update depositor's reward (reward - lpreward);
-                depositor.rewardAmount += rewardAmount.sub(lpReward);
+                // Update deposit's reward (reward - lpreward);
+                deposit.rewardAmount += rewardAmount.sub(lpReward);
             }
         }
 
@@ -189,24 +192,24 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
                     0
                 );
 
-            // Calculate depositor's debt amount based on the withdrawn amount
+            // Calculate deposit's debt amount based on the withdrawn amount
             uint256 withdrawDebtAmount = amount
-                .mul(depositor.debtAmount[lpTokenAddress])
+                .mul(deposit.debtAmount[lpTokenAddress])
                 .div(totalAmount);
-            // Calculate's depositor's deposit amount based on the withdrawn amount
+            // Calculate's deposit's deposit amount based on the withdrawn amount
             withdrawDepositAmount = amount
-                .mul(depositor.depositAmount[lpTokenAddress])
+                .mul(deposit.depositAmount[lpTokenAddress])
                 .div(totalAmount);
 
             // Update pool's balance, borrow and stake amount
             pool.balanceAmount += withdrawDebtAmount;
             pool.borrowAmount -= withdrawDebtAmount;
-            pool.stakeAmount -= _amount;
+            pool.stakeAmount[lpTokenAddress] -= _amount;
 
-            // Update depositor's stake, debt and deposit amount
-            depositor.stakeAmount[lpTokenAddress] -= amount;
-            depositor.debtAmount[lpTokenAddress] -= withdrawDebtAmount;
-            depositor.depositAmount[lpTokenAddress] -= withdrawDepositAmount;
+            // Update deposit's stake, debt and deposit amount
+            deposit.stakeAmount[lpTokenAddress] -= amount;
+            deposit.debtAmount[lpTokenAddress] -= withdrawDebtAmount;
+            deposit.depositAmount[lpTokenAddress] -= withdrawDepositAmount;
         }
 
         // Transfer user's withdraw token

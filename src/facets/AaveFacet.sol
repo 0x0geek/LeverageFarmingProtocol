@@ -38,14 +38,17 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
 
         IERC20 underlyingToken = IERC20(pool.tokenAddress);
+        console.log(underlyingToken.balanceOf(msg.sender));
+        console.log(_amount);
 
         // If user hasn't enough balance, should revert
         if (underlyingToken.balanceOf(msg.sender) < _amount)
             revert InsufficientUserBalance();
 
+        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
+
         // Calculate leverage amount based on user's deposit amount
         uint256 leverageAmount = _amount.mul(_leverageRate);
-        uint256 depositAmount = _amount.add(leverageAmount);
 
         // If pool hasn't sufficient balance, should revert
         if (pool.balanceAmount < leverageAmount)
@@ -54,8 +57,8 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         // Transfer tokens to dimaond proxy
         underlyingToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
         address aTokenAddress = pool.aTokenAddress;
@@ -64,9 +67,9 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         pool.balanceAmount -= leverageAmount;
         pool.borrowAmount += leverageAmount;
 
-        // Update depositor's deposit and debt amount
-        depositor.depositAmount[aTokenAddress] += _amount;
-        depositor.debtAmount[aTokenAddress] += leverageAmount;
+        // Update deposit's deposit and debt amount
+        deposit.depositAmount[aTokenAddress] += _amount;
+        deposit.debtAmount[aTokenAddress] += leverageAmount;
 
         // Get AToken balance
         uint256 beforeATokenBalance = IERC20(aTokenAddress).balanceOf(
@@ -74,12 +77,15 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         );
 
         // Approve the Aave lending pool to spend the tokens
-        underlyingToken.safeApprove(_lendingPool(), depositAmount);
+        underlyingToken.safeApprove(
+            _lendingPool(),
+            _amount.add(leverageAmount)
+        );
 
         // Deposit tokens into Aave v2 lending pool
         ILendingPool(_lendingPool()).deposit(
             pool.tokenAddress,
-            depositAmount,
+            _amount.add(leverageAmount),
             address(this),
             0
         );
@@ -88,9 +94,9 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
             .balanceOf(address(this))
             .sub(beforeATokenBalance);
 
-        // Update depositor's stake amount and pool's stake amount
-        depositor.stakeAmount[aTokenAddress] += balanceDiff;
-        pool.stakeAmount += balanceDiff;
+        // Update deposit's stake amount and pool's stake amount
+        deposit.stakeAmount[aTokenAddress] += balanceDiff;
+        pool.stakeAmount[aTokenAddress] += balanceDiff;
     }
 
     /**
@@ -104,12 +110,12 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
     ) external onlyRegisteredAccount onlySupportedPool(_poolIndex) noReentrant {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
-        LibFarmStorage.Depositor storage depositor = fs.depositors[_poolIndex][
-            msg.sender
+        LibFarmStorage.Deposit storage deposit = fs.deposits[msg.sender][
+            _poolIndex
         ];
 
-        // If depositor hasn't sufficient balance for withdraw, should revert
-        if (depositor.stakeAmount[pool.aTokenAddress] < _amount)
+        // If deposit hasn't sufficient balance for withdraw, should revert
+        if (deposit.stakeAmount[pool.aTokenAddress] < _amount)
             revert InsufficientUserBalance();
 
         IERC20 aToken = IERC20(pool.aTokenAddress);
@@ -118,33 +124,33 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         if (aToken.balanceOf(address(this)) < _amount)
             revert InsufficientPoolBalance();
 
-        // Calculates depositor's total debt amount
-        uint256 totalAmount = depositor.debtAmount[pool.aTokenAddress].add(
-            depositor.depositAmount[pool.aTokenAddress]
+        // Calculates deposit's total debt amount
+        uint256 totalAmount = deposit.debtAmount[pool.aTokenAddress].add(
+            deposit.depositAmount[pool.aTokenAddress]
         );
 
-        // Calculate withdraw amount based on depositor's amount and debt amount
+        // Calculate withdraw amount based on deposit's amount and debt amount
         uint256 withdrawDebtAmount = _amount
-            .mul(depositor.debtAmount[pool.aTokenAddress])
+            .mul(deposit.debtAmount[pool.aTokenAddress])
             .div(totalAmount);
         uint256 withdrawDepositAmount = _amount
-            .mul(depositor.depositAmount[pool.aTokenAddress])
+            .mul(deposit.depositAmount[pool.aTokenAddress])
             .div(totalAmount);
 
-        // Update depositor's stake, deposit and debt amount
-        depositor.stakeAmount[pool.aTokenAddress] -= _amount;
-        depositor.depositAmount[pool.aTokenAddress] -= withdrawDepositAmount;
-        depositor.debtAmount[pool.aTokenAddress] -= withdrawDebtAmount;
+        // Update deposit's stake, deposit and debt amount
+        deposit.stakeAmount[pool.aTokenAddress] -= _amount;
+        deposit.depositAmount[pool.aTokenAddress] -= withdrawDepositAmount;
+        deposit.debtAmount[pool.aTokenAddress] -= withdrawDebtAmount;
 
         // Calculate Pool's total reward
         uint256 totalRewardAmount = IERC20(pool.aTokenAddress).balanceOf(
             address(this)
-        ) - pool.stakeAmount;
+        ) - pool.stakeAmount[pool.aTokenAddress];
 
         if (totalRewardAmount > 0) {
-            // Calculate depositor's reward based on his stake amount
+            // Calculate deposit's reward based on his stake amount
             uint256 rewardAmount = totalRewardAmount.mul(totalAmount).div(
-                pool.stakeAmount
+                pool.stakeAmount[pool.aTokenAddress]
             );
 
             // Calculate lp's reward amount
@@ -152,14 +158,14 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
 
             // Update pool's balance including reward
             pool.balanceAmount += lpReward;
-            // Update depositor's reward amount
-            depositor.rewardAmount += rewardAmount.sub(lpReward);
+            // Update deposit's reward amount
+            deposit.rewardAmount += rewardAmount.sub(lpReward);
         }
 
         // Update pool's balance, borrow and stake amount
         pool.balanceAmount += withdrawDebtAmount;
         pool.borrowAmount -= withdrawDebtAmount;
-        pool.stakeAmount -= _amount;
+        pool.stakeAmount[pool.aTokenAddress] -= _amount;
 
         address lendingPoolAddr = _lendingPool();
 

@@ -138,16 +138,30 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         vm.startPrank(alice);
 
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
-        accFacet.liquidate(address(bob), 1, 10);
+        accFacet.liquidate(address(bob), 10, USDC_ADDRESS);
 
         // Alice create account and liquidate bob's one, but pool is not supported, revert
         accFactory.createAccount();
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
-        accFacet.liquidate(address(bob), 4, 10);
+        accFacet.liquidate(address(bob), 10, USDC_ADDRESS);
 
         // Alice is going to liquidate his one, should revert
         vm.expectRevert(BaseFacet.InvalidLiquidateUser.selector);
-        accFacet.liquidate(address(alice), 1, 10);
+        accFacet.liquidate(address(alice), 10, USDC_ADDRESS);
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
+
+        vm.startPrank(alice);
+        accFactory.createAccount();
+        accFacet.deposit(1, 1000);
+        vm.stopPrank();
+
+        skip(SKIP_FORWARD_PERIOD);
+
+        vm.startPrank(bob);
+        accFacet.liquidate(address(alice), 5000, USDC_ADDRESS);
         vm.stopPrank();
     }
 

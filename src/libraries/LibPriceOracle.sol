@@ -6,10 +6,10 @@ import "@chainlink/src/interfaces/AggregatorV3Interface.sol";
 library LibPriceOracle {
     address public constant ETH_USD_PRICE_FEED =
         0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
-    address public constant USD_ETH_PRICE_FEED =
-        0x986b5E1e1755e3C2440e960477f25201B0a8bbD4;
     address public constant USDC_USD_PRICE_FEED =
         0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+    address public constant USDT_USD_PRICE_FEED =
+        0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
     address public constant CRV_USD_PRICE_FEED =
         0xCd627aA160A6fA45Eb793D19Ef54f5062F20f33f;
     address public constant COMP_USD_PRICE_FEED =
