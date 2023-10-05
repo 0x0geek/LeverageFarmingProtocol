@@ -2,8 +2,6 @@
 pragma solidity 0.8.20;
 pragma experimental ABIEncoderV2;
 
-import "forge-std/console.sol";
-
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -52,6 +50,11 @@ contract BaseFacet {
 
     modifier onlyRegisteredAccount() {
         checkExistAccount(msg.sender);
+        _;
+    }
+
+    modifier onlyRegisteredUser(address _user) {
+        checkExistAccount(_user);
         _;
     }
 
@@ -119,8 +122,10 @@ contract BaseFacet {
     function checkIfSupportedLeverageRate(
         uint8 _leverageRate
     ) internal view virtual {
-        if (_leverageRate == 0 || _leverageRate > 5)
-            revert InvalidLeverageRate();
+        if (
+            _leverageRate == 1 ||
+            _leverageRate > LibFarmStorage.MAX_LEVERAGE_LEVEL
+        ) revert InvalidLeverageRate();
     }
 
     function calculateAssetAmount(
@@ -223,22 +228,17 @@ contract BaseFacet {
         uint256 totalUserPortion = getUserPortion(_user);
         uint256 totalUserDebt = getUserDebt(_user);
 
+        if (totalUserDebt == 0) return 100;
+
         uint256 healthRatio = totalUserPortion
             .mul(LibFarmStorage.COLLATERAL_FACTOR)
             .div(totalUserDebt);
 
-        console.log("Health ratio");
-        console.log(healthRatio);
-        console.log(totalUserPortion);
-        console.log(totalUserDebt);
-
-        return 110;
+        return healthRatio;
     }
 
     function getUserDebt(address _user) internal view returns (uint256) {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
-        LibFarmStorage.Deposit storage usdcDeposit = fs.deposits[_user][1];
-        LibFarmStorage.Deposit storage usdtDeposit = fs.deposits[_user][2];
 
         uint256 userDebtAmount;
 
@@ -268,7 +268,9 @@ contract BaseFacet {
 
         uint256 usdAmount;
 
-        usdAmount += ethDeposit.amount.mul(etherUsdPrice).div(1e8);
+        if (ethDeposit.amount > 0)
+            usdAmount += ethDeposit.amount.mul(etherUsdPrice).div(1e8);
+
         usdAmount += usdcDeposit.amount;
         usdAmount += usdtDeposit.amount;
 
@@ -294,12 +296,14 @@ contract BaseFacet {
         );
 
         for (uint8 i; i != LibFarmStorage.MAX_POOL_LENGTH; ++i) {
-            LibFarmStorage.Deposit storage deposit = fs.deposits[_user][i];
+            LibFarmStorage.Deposit storage userDeposit = fs.deposits[_user][i];
             if (i == 0) {
-                if (deposit.amount > 0)
-                    totalUsdValue += deposit.amount.mul(etherUsdPrice).div(1e8);
+                if (userDeposit.amount > 0)
+                    totalUsdValue += userDeposit.amount.mul(etherUsdPrice).div(
+                        1e8
+                    );
             } else {
-                totalUsdValue += deposit.amount;
+                totalUsdValue += userDeposit.amount;
             }
         }
 
@@ -315,6 +319,17 @@ contract BaseFacet {
             _aggregatorAddress
         );
 
-        return totalUsdValue.div(tokenUsdPrice.div(1e2));
+        return totalUsdValue.div(tokenUsdPrice.div(1e2)).mul(1e6);
+    }
+
+    function getAggregatorAddress(
+        address _token
+    ) internal pure returns (address) {
+        if (_token == LibFarmStorage.USDC_ADDRESS)
+            return LibPriceOracle.USDC_USD_PRICE_FEED;
+        else if (_token == LibFarmStorage.USDT_ADDRESS)
+            return LibPriceOracle.USDT_USD_PRICE_FEED;
+
+        return LibPriceOracle.ETH_USD_PRICE_FEED;
     }
 }

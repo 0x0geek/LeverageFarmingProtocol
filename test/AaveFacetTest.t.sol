@@ -48,7 +48,7 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_depositToAave() public {
-        uint8 leverageRate = 3;
+        uint8 leverageRate = 4;
         uint256 amount = 1000;
 
         AaveFacet aveFacet = AaveFacet(address(diamond));
@@ -74,6 +74,15 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
         vm.expectRevert(BaseFacet.InsufficientUserBalance.selector);
         aveFacet.depositToAave(1, leverageRate, aliceUsdcBalance + 1);
 
+        vm.expectRevert(BaseFacet.InsufficientCollateral.selector);
+        aveFacet.depositToAave(1, leverageRate, 10000);
+
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 1500);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+
+        vm.startPrank(alice);
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(aveFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
@@ -81,6 +90,7 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.stopPrank();
 
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 4500);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -93,11 +103,8 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
     function test_withdrawFromAave() public {
         uint8 leverageRate = 3;
 
-        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
-        depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
-
         uint256 amount = 1000;
-        uint256 withdrawAmount = 1000;
+        uint256 withdrawAmount = 500;
 
         AaveFacet aveFacet = AaveFacet(address(diamond));
 
@@ -108,6 +115,13 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
         aveFacet.withdrawFromAave(1, amount.toE6());
 
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, alice, 1500);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
+
+        vm.startPrank(alice);
         // Alice creates account and deposit 1000 DAI to Aave, but trying with unsupported token, should revert.
         accFactory.createAccount();
 

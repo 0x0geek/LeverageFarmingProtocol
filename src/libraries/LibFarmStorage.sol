@@ -38,7 +38,7 @@ library LibFarmStorage {
     uint256 public constant MAX_LEVERAGE_LEVEL = 5;
     uint8 public constant COLLATERAL_FACTOR = 83;
     uint8 public constant MAX_POOL_LENGTH = 3;
-    uint8 public constant LIQUIDATE_FEE = 110;
+    uint8 public constant LIQUIDATE_FEE = 90;
 
     struct Pool {
         address tokenAddress;

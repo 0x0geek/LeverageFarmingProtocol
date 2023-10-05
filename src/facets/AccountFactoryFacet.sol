@@ -21,7 +21,7 @@ contract AccountFactoryFacet is BaseFacet, ReEntrancyGuard {
     function createAccount(address _user) external {
         LibFarmStorage.FarmStorage storage fs = LibFarmStorage.farmStorage();
 
-        if (fs.accounts[_user] == true) revert AccountAlreadyExist();
+        if (fs.accounts[_user] == true) return;
 
         fs.accounts[_user] = true;
 

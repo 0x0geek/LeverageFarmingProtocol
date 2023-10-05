@@ -57,7 +57,7 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_depositToCurve() public {
-        uint8 leverageRate = 2;
+        uint8 leverageRate = 3;
         uint256 amount = 1000;
 
         CurveFacet crvFacet = CurveFacet(address(diamond));
@@ -92,6 +92,15 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
             aliceUsdcBalance + 1
         );
 
+        vm.expectRevert(BaseFacet.InsufficientCollateral.selector);
+        crvFacet.depositToCurve(1, leverageRate, testCrvData, amount.toE6());
+
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 1500);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+
+        vm.startPrank(alice);
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(crvFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
@@ -99,6 +108,7 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.stopPrank();
 
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 4500);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -111,6 +121,7 @@ contract CurveFacetTest is BaseSetup, StateDeployDiamond {
     function test_withdrawFromCurve() public {
         uint8 leverageRate = 2;
 
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, alice, 1500);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 

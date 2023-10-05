@@ -43,14 +43,19 @@ contract CompoundFacet is BaseFacet, ReEntrancyGuard {
         if (IERC20(pool.tokenAddress).balanceOf(msg.sender) < _amountToSupply)
             revert InsufficientUserBalance();
 
-        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
-
         address cTokenAddress;
         uint256 depositAmount;
 
         {
             // Calculate's leverage amount based on user's deposit amount
-            uint256 leverageAmount = _amountToSupply.mul(_leverageRate);
+            uint256 leverageAmount = _amountToSupply.mul(_leverageRate - 1);
+
+            if (
+                getBorrowableAmount(
+                    msg.sender,
+                    getAggregatorAddress(pool.tokenAddress)
+                ).mul(LibFarmStorage.MAX_LEVERAGE_LEVEL) < leverageAmount
+            ) revert InsufficientCollateral();
 
             // If pool hasn't enough balance, should revert
             if (pool.balanceAmount < leverageAmount)

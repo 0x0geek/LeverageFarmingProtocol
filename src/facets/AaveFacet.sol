@@ -38,17 +38,20 @@ contract AaveFacet is BaseFacet, ReEntrancyGuard {
         LibFarmStorage.Pool storage pool = fs.pools[_poolIndex];
 
         IERC20 underlyingToken = IERC20(pool.tokenAddress);
-        console.log(underlyingToken.balanceOf(msg.sender));
-        console.log(_amount);
 
         // If user hasn't enough balance, should revert
         if (underlyingToken.balanceOf(msg.sender) < _amount)
             revert InsufficientUserBalance();
 
-        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
-
         // Calculate leverage amount based on user's deposit amount
         uint256 leverageAmount = _amount.mul(_leverageRate);
+
+        if (
+            getBorrowableAmount(
+                msg.sender,
+                getAggregatorAddress(pool.tokenAddress)
+            ).mul(LibFarmStorage.MAX_LEVERAGE_LEVEL) < leverageAmount
+        ) revert InsufficientCollateral();
 
         // If pool hasn't sufficient balance, should revert
         if (pool.balanceAmount < leverageAmount)

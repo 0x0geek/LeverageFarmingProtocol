@@ -8,14 +8,19 @@ import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 import "../src/facets/AccountFacet.sol";
 import "../src/facets/AaveFacet.sol";
+import "../src/facets/CompoundFacet.sol";
+
 import "../src/AccountFactory.sol";
 import "../src/LeverageFarming.sol";
+import "./utils/Math.sol";
 
 import {BaseSetup} from "./utils/BaseSetup.sol";
 import {StateDeployDiamond} from "./utils/StateDeployDiamond.sol";
 
 contract AccountFacetTest is BaseSetup, StateDeployDiamond {
     using SafeERC20 for IERC20;
+    using Math for uint256;
+
     AccountFactory implementation;
     AccountFactory accFactory;
     LeverageFarming farming;
@@ -48,10 +53,6 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
     function test_createAccount() public {
         // Alice creates account
         vm.startPrank(alice);
-        accFactory.createAccount();
-
-        // Alice creates account again, but reverts because he already created account.
-        vm.expectRevert(AccountFactoryFacet.AccountAlreadyExist.selector);
         accFactory.createAccount();
         vm.stopPrank();
     }
@@ -114,9 +115,9 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         accFacet.withdraw(3, 500);
 
         vm.expectRevert(BaseFacet.ZeroAmountForWithdraw.selector);
-        accFacet.withdraw(1, 500);
+        accFacet.withdraw(1, 0);
 
-        // Alice deposits 500 USDC to pool
+        // // Alice deposits 500 USDC to pool
         IERC20(USDC_ADDRESS).safeApprove(address(accFacet), 500);
         accFacet.deposit(1, 500);
 
@@ -134,6 +135,8 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
     }
 
     function test_liquidate() public {
+        uint256 amount = 10000;
+
         // Alice liquidate without creating account
         vm.startPrank(alice);
 
@@ -150,13 +153,14 @@ contract AccountFacetTest is BaseSetup, StateDeployDiamond {
         accFacet.liquidate(address(alice), 10, USDC_ADDRESS);
         vm.stopPrank();
 
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, alice, 1500);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
-        vm.startPrank(alice);
-        accFactory.createAccount();
-        accFacet.deposit(1, 1000);
-        vm.stopPrank();
+        // Alice deposits 1000 USDC to Compound for leverage
+        CompoundFacet compFacet = CompoundFacet(address(diamond));
+        IERC20(USDC_ADDRESS).safeApprove(address(compFacet), amount.toE6());
+        compFacet.supplyToken(1, 5, amount.toE6());
 
         skip(SKIP_FORWARD_PERIOD);
 

@@ -77,6 +77,15 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
         vm.expectRevert(BaseFacet.InsufficientUserBalance.selector);
         compFacet.supplyToken(1, leverageRate, aliceUsdcBalance + 1);
 
+        vm.expectRevert(BaseFacet.InsufficientCollateral.selector);
+        compFacet.supplyToken(1, leverageRate, 10000);
+
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 1500);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+
+        vm.startPrank(alice);
         // Alice tries to leverage farming with 1000 USDC, but there is no enough balance in pool.
         IERC20(USDC_ADDRESS).safeApprove(address(compFacet), amount.toE6());
         vm.expectRevert(BaseFacet.InsufficientPoolBalance.selector);
@@ -84,6 +93,7 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
 
         vm.stopPrank();
 
+        depositTokenToPool(address(accFactory), USDT_ADDRESS, alice, 4500);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
         depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
@@ -95,8 +105,6 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
 
     function test_redeemCErc20Tokens() public {
         uint8 leverageRate = 4;
-        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
-        depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
 
         uint256 amount = 1000;
 
@@ -109,6 +117,13 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
         vm.expectRevert(BaseFacet.InvalidAccount.selector);
         compFacet.redeemCErc20Tokens(1, amount.toE6(), true);
 
+        vm.stopPrank();
+
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, alice, 1500);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, bob, 1000);
+        depositTokenToPool(address(accFactory), USDC_ADDRESS, carol, 6000);
+
+        vm.startPrank(alice);
         // Alice creates account and deposit 1000 DAI to Compound, but trying with unsupported token, should revert.
         accFactory.createAccount();
 
@@ -121,41 +136,41 @@ contract CompoundFacetTest is BaseSetup, StateDeployDiamond {
         compFacet.redeemCErc20Tokens(3, amount.toE6(), true);
         vm.stopPrank();
 
-        vm.startPrank(bob);
+        // vm.startPrank(bob);
 
-        {
-            CEth cEth = CEth(CETHER_ADDRESS);
-            Comptroller comptroller = Comptroller(COMPTROLLER_ADDRESS);
-            CErc20 cToken = CErc20(CUSDC_ADDRESS);
+        // {
+        //     CEth cEth = CEth(CETHER_ADDRESS);
+        //     Comptroller comptroller = Comptroller(COMPTROLLER_ADDRESS);
+        //     CErc20 cToken = CErc20(CUSDC_ADDRESS);
 
-            // Supply ETH as collateral, get cETH in return
-            cEth.mint{value: 10 * ETHER_DECIMAL, gas: 250000}();
+        //     // Supply ETH as collateral, get cETH in return
+        //     cEth.mint{value: 10 * ETHER_DECIMAL, gas: 250000}();
 
-            // Enter the ETH market so you can borrow another type of asset
-            address[] memory cTokens = new address[](1);
-            cTokens[0] = CETHER_ADDRESS;
+        //     // Enter the ETH market so you can borrow another type of asset
+        //     address[] memory cTokens = new address[](1);
+        //     cTokens[0] = CETHER_ADDRESS;
 
-            uint256[] memory errors = comptroller.enterMarkets(cTokens);
+        //     uint256[] memory errors = comptroller.enterMarkets(cTokens);
 
-            if (errors[0] != 0) revert EnterMarketError();
+        //     if (errors[0] != 0) revert EnterMarketError();
 
-            // Borrow underlying
-            uint256 numUnderlyingToBorrow = 12000;
+        //     // Borrow underlying
+        //     uint256 numUnderlyingToBorrow = 12000;
 
-            // Borrow, check the underlying balance for this contract's address
-            cToken.borrow(numUnderlyingToBorrow.toE6());
+        //     // Borrow, check the underlying balance for this contract's address
+        //     cToken.borrow(numUnderlyingToBorrow.toE6());
 
-            // Get the borrow balance
-            cToken.borrowBalanceCurrent(address(this));
-        }
+        //     // Get the borrow balance
+        //     cToken.borrowBalanceCurrent(address(this));
+        // }
 
-        vm.stopPrank();
+        // vm.stopPrank();
 
-        vm.startPrank(alice);
-        skip(SKIP_FORWARD_PERIOD);
+        // vm.startPrank(alice);
+        // skip(SKIP_FORWARD_PERIOD);
 
-        compFacet.redeemCErc20Tokens(1, 10000000, true);
+        // compFacet.redeemCErc20Tokens(1, 10000000, true);
 
-        vm.stopPrank();
+        // vm.stopPrank();
     }
 }

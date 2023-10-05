@@ -49,10 +49,15 @@ contract CurveFacet is BaseFacet, ReEntrancyGuard {
         if (IERC20(pool.tokenAddress).balanceOf(msg.sender) < _amount)
             revert InsufficientUserBalance();
 
-        if (getHealthRatio(msg.sender) < 100) revert InsufficientCollateral();
-
         // Calculates the leverage amount based on user's deposit amount.
-        uint256 leverageAmount = _amount.mul(_leverageRate);
+        uint256 leverageAmount = _amount.mul(_leverageRate - 1);
+
+        if (
+            getBorrowableAmount(
+                msg.sender,
+                getAggregatorAddress(pool.tokenAddress)
+            ).mul(LibFarmStorage.MAX_LEVERAGE_LEVEL) < leverageAmount
+        ) revert InsufficientCollateral();
 
         // If pool hasn't enough balance for leverage amount, should revert
         if (pool.balanceAmount < leverageAmount)
