@@ -70,6 +70,7 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
     @param _collateral The address of token to use for liquidation.
     **/
     function liquidate(
+        address _diamond,
         address _user,
         uint256 _amount,
         address _collateral
@@ -103,8 +104,6 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
             .div(LibFarmStorage.LIQUIDATE_FEE)
             .mul(100);
 
-        if (_amount < liquidateAmount) revert InsufficientLiquidateAmount();
-
         if (_collateral != address(0x0)) {
             // Transfer tokens to diamond proxy for liquidattion
             IERC20(_collateral).safeTransferFrom(
@@ -114,16 +113,26 @@ contract AccountFacet is BaseFacet, ReEntrancyGuard {
             );
         }
 
+        CurveData testCrvData = CurveData({
+            poolAddress: AAVE_POOL_ADDRESS,
+            gaugeAddress: AAVE_LIQUIDITY_GAUGE_ADDRESS,
+            minterAddress: CRV_TOKEN_MINTER_ADDRESS,
+            lpTokenAddress: AAVE_POOL_LP_TOKEN_ADDRESS
+        });
+
         // Calculate liquidator's portion
         for (uint8 i; i != LibFarmStorage.MAX_POOL_LENGTH; ++i) {
+
             LibFarmStorage.Deposit storage liquidator = fs.deposits[msg.sender][
                 i
             ];
             LibFarmStorage.Deposit storage userDeposit = fs.deposits[_user][i];
+            LibFarmStorage.Pool storage pool = fs.pools[i];
 
-            // Update liquidator's portion
-            liquidator = userDeposit;
-            delete fs.deposits[_user][i];
+            // Close user's portion
+            IAaveFacet(_diamond).withdrawFromAave(i, userDeposit.stakeAmount[pool.aTokenAddress]);
+            ICompoundFacet(_diamond).redeemCErc20Tokens(i, userDepost.stakeAmount[pool.cTokenAddress], true);
+            ICurveFacet(_diamond).withdrawFromCurve(i, testCrvData, userDeposit.stakeAmount[pool.crvLpTokenAddress]);
         }
     }
 
