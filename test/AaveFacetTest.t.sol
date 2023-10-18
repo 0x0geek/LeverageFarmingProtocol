@@ -129,7 +129,7 @@ contract AaveFacetTest is BaseSetup, StateDeployDiamond {
         IERC20(USDC_ADDRESS).safeApprove(address(aveFacet), amount.toE6());
         aveFacet.depositToAave(1, leverageRate, amount.toE6());
 
-        // Alice withdraw 1000 DAI from Aave, but it's not supported, should revert
+        // Alice withdraw 5000 DAI from Aave, but it's not supported, should revert
         vm.expectRevert(BaseFacet.NotSupportedToken.selector);
         aveFacet.withdrawFromAave(3, withdrawAmount.toE6());
 
